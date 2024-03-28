@@ -1,2 +1,2 @@
-.. |tora| replace:: Distributed Algorithm Name 
+.. |tora| replace:: Temporally Ordered Routing Algorithm 
 
