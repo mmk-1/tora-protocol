@@ -35,6 +35,15 @@ def main():
     topology.nodes[destination_id].set_height(TORAHeight(0, 0, 0, 0, destination_id))
     topology.start()
     topology.nodes[source_id].create_route(destination_id)
+    
+    set destination height!!!!!!!!!
+    
+    
+    def init_route_creation(self, did: int):
+        self.appllayer.handle_qry(did, self.componentinstancenumber)
+        
+    
+    
     topology.nodes[source_id].send_message(destination_id, "Hello World!")
     '''
 
