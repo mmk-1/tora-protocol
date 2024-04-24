@@ -1,24 +1,27 @@
 import networkx as nx
+from adhoccomputing.Networking.LogicalChannels.GenericChannel import GenericChannel
 from matplotlib import pyplot as plt
 
 from adhoccomputing.GenericModel import Topology
-from ..TORA import TORANode, TORAHeight
+
+from TORA.TORAComponent import TORANode, TORAHeight
 
 
 def main():
-    G = nx.Graph()
+    graph = nx.Graph()
 
-    G.add_edge(0, 1)
-    G.add_edge(0, 7)
-    G.add_edge(0, 3)
-    G.add_edge(1, 6)
-    G.add_edge(6, 5)
-    G.add_edge(6, 4)
-    G.add_edge(4, 2)
+    graph.add_edge(0, 1)
+    graph.add_edge(0, 7)
+    graph.add_edge(0, 3)
+    graph.add_edge(1, 6)
+    graph.add_edge(6, 5)
+    graph.add_edge(6, 4)
+    graph.add_edge(4, 2)
 
-    nx.draw(G, with_labels=True, font_weight="bold")
+    nx.draw(graph, with_labels=True, font_weight="bold")
     plt.draw()
-    plt.show()
+    # plt.show()
+    plt.savefig("initial_graph.png")
     
     '''
     # Start TORA
@@ -29,7 +32,7 @@ def main():
     # 4. Create route to destination
     # 5. Start
     topology = Topology()
-    topology.construct_from_graph(G, TORANode, Channel)
+    topology.construct_from_graph(graph, TORANode, Channel)
     source_id = 0
     destination_id = 7
     topology.nodes[destination_id].set_height(TORAHeight(0, 0, 0, 0, destination_id))
@@ -46,6 +49,15 @@ def main():
     
     topology.nodes[source_id].send_message(destination_id, "Hello World!")
     '''
+    topology = Topology()
+    topology.construct_from_graph(graph, TORANode, GenericChannel)
+    print(len(topology.nodes))
+    source_id = 0
+    destination_id = 7
+    destination_height: TORAHeight = TORAHeight(0, 0, 0, 0, destination_id)
+    topology.start()
+    topology.nodes[destination_id].set_height(destination_height)
+    topology.nodes[source_id].app_layer.handle_query(destination_id)
 
     # Draw final DAG
 

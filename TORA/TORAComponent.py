@@ -63,7 +63,7 @@ class TORAPacketUPDPayload(GenericMessagePayload):
 #         self.message = message
 
 class TORAComponent(GenericModel):
-    def __init__(self, component_id, component_name, topology: Topology):
+    def __init__(self, component_name: str, component_id: int, topology: Topology):
         '''
         Each node i requires:
         - Height
@@ -392,12 +392,12 @@ class TORAComponent(GenericModel):
 
 
 class TORANode(GenericModel):
-    def __init__(self, component_id, component_name, topology):
+    def __init__(self, component_name: str, component_id: int, topology):
         super().__init__(component_name, component_id, topology=topology)
 
-        self.app_layer: TORAComponent = TORAComponent(component_id, component_name, topology)
-        self.net_layer = GenericNetworkLayer("NetworkLayer", component_id)
-        self.link_layer = GenericLinkLayer("LinkLayer", component_id)
+        self.app_layer: TORAComponent = TORAComponent(component_name, component_id, topology)
+        self.net_layer = GenericNetworkLayer("NetworkLayer", component_id, topology=topology)
+        self.link_layer = GenericLinkLayer("LinkLayer", component_id, topology=topology)
 
         # CONNECTIONS AMONG SUBCOMPONENTS
         self.app_layer.connect_me_to_component(ConnectorTypes.DOWN, self.net_layer)
@@ -410,3 +410,6 @@ class TORANode(GenericModel):
         # Connect the bottom component to the composite component....
         self.link_layer.connect_me_to_component(ConnectorTypes.DOWN, self)
         self.connect_me_to_component(ConnectorTypes.UP, self.link_layer)
+
+    def set_height(self, height: TORAHeight):
+        self.app_layer.height = height
