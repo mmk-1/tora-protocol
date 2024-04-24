@@ -137,3 +137,6 @@ dmypy.json
 .vscode
 
 _build/
+
+# Don't have AHC repo as a submodule!
+ahc/

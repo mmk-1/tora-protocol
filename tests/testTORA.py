@@ -49,15 +49,17 @@ def main():
     
     topology.nodes[source_id].send_message(destination_id, "Hello World!")
     '''
-    topology = Topology()
-    topology.construct_from_graph(graph, TORANode, GenericChannel)
-    print(len(topology.nodes))
-    source_id = 0
-    destination_id = 7
-    destination_height: TORAHeight = TORAHeight(0, 0, 0, 0, destination_id)
-    topology.start()
-    topology.nodes[destination_id].set_height(destination_height)
-    topology.nodes[source_id].app_layer.handle_query(destination_id)
+    # topology = Topology()
+    # topology.construct_from_graph(graph, TORANode, GenericChannel)
+    # print(len(topology.nodes))
+    # source_id = 0
+    # destination_id = 7
+    # destination_height: TORAHeight = TORAHeight(0, 0, 0, 0, destination_id)
+    # topology.start()
+    # topology.nodes[destination_id].set_height(destination_height)
+    # topology.nodes[source_id].app_layer.handle_query(destination_id)
+
+    print("Routing done!")
 
     # Draw final DAG
 
