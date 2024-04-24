@@ -11,7 +11,7 @@ from adhoccomputing.Networking.NetworkLayer.GenericNetworkLayer import GenericNe
 # Types
 from adhoccomputing.Generics import GenericMessage, GenericMessageHeader, GenericMessagePayload
 
-class TORAPacketTypes(Enum):
+class TORAControlPacketTypes(Enum):
     QRY = "QUERY"
     UPD = "UPDATE"
     CLR = "CLEAR"
@@ -46,22 +46,40 @@ class TORAPacketCLRPayload(GenericMessagePayload):
         # TODO: Create a ReferenceLevel class
         self.reference_level: Tuple[int, int, int] = reference_level
 
-
 class TORAPacketUPDPayload(GenericMessagePayload):
     def __init__(self, destination_id: int, height: TORAHeight, link_reversal: bool):
         self.destination_id: int = destination_id
         self.height: TORAHeight = height
         self.link_reversal: bool = link_reversal
 
+# New Headers. Keep data in headers only!!!
+class ReferenceLevel:
+    def __init__(self, tau, oid, r):
+        self.tau = tau
+        self.oid = oid
+        self.r = r
 
-# class ApplicationLayerMessageMessagePayload(GenericMessagePayload):
-#     did: int
-#     message: str
-#
-#     def __init__(self, did: int, message: str):
-#         self.did = did
-#         self.message = message
+class TORAControlPacket(GenericMessage):
+    def __init__(self, header: GenericMessageHeader, payload: GenericMessagePayload):
+        self.header: GenericMessageHeader = header
+        self.payload: GenericMessagePayload = payload # None?
 
+class UPDHeader(GenericMessageHeader):
+    def __init__(self, destination_id: int, height: TORAHeight, link_reversal: bool):
+        self.destination_id: int = destination_id
+        self.height: TORAHeight = height
+        self.link_reversal: bool = link_reversal
+
+class CLRHeader(GenericMessageHeader):
+    def __init__(self, destination_id: int, reference_level: ReferenceLevel):
+        self.destination_id: int = destination_id
+        self.reference_level: ReferenceLevel = reference_level
+
+class QRYHeader(GenericMessageHeader):
+    def __init__(self, destination_id: int):
+        self.destination_id: int = destination_id
+
+# Application layer component
 class TORAComponent(GenericModel):
     def __init__(self, component_name: str, component_id: int, topology: Topology):
         '''
@@ -87,14 +105,13 @@ class TORAComponent(GenericModel):
     def on_message_from_bottom(self, eventobj: Event):
         message: GenericMessage = eventobj.eventcontent
         header: GenericMessageHeader = message.header
-        # payload: GenericMessagePayload = message.payload
 
         # Check type of message and handle it!
-        if header.messagetype == TORAPacketTypes.QRY:
+        if header.messagetype == TORAControlPacketTypes.QRY:
             self.handle_query(message)
-        elif header.messagetype == TORAPacketTypes.CLR:
+        elif header.messagetype == TORAControlPacketTypes.CLR:
             pass
-        elif header.messagetype == TORAPacketTypes.UPD:
+        elif header.messagetype == TORAControlPacketTypes.UPD:
             pass
         else:
             raise Exception("UNKNOWN MESSAGE TYPE!")
@@ -177,9 +194,7 @@ class TORAComponent(GenericModel):
             if len(downstream_links):
                 return
 
-            upstream_links: List[Tuple[TORAHeight, int]] = list(
-                self.get_upstream_links().items()
-            )
+            upstream_links: List[Tuple[TORAHeight, int]] = list(self.get_upstream_links().items())
             reference_level: TORAHeight = TORAHeight(-1, None, None, None, None)
             same_reference_level = True
 
@@ -372,19 +387,18 @@ class TORAComponent(GenericModel):
     def broadcast_query_packet(self, destination_id: int):
         self.route_required = True
         payload: TORAPacketQRYPayload = TORAPacketQRYPayload(destination_id)
-        self.broadcast(TORAPacketTypes.QRY, payload)
+        self.broadcast(TORAControlPacketTypes.QRY, payload)
 
     def broadcast_upd_packet(self, destination_id: int, link_reversal: bool):
         self.last_upd = time.time()
         payload: TORAPacketUPDPayload = TORAPacketUPDPayload(destination_id, self.height, link_reversal)
-        self.broadcast(TORAPacketTypes.UPD, payload)
+        self.broadcast(TORAControlPacketTypes.UPD, payload)
 
     def broadcast_clr_packet(self, destination_id: int, reference_level):
         payload: TORAPacketCLRPayload = TORAPacketCLRPayload(destination_id, reference_level)
-        self.broadcast(TORAPacketTypes.CLR, payload)
+        self.broadcast(TORAControlPacketTypes.CLR, payload)
 
-    def broadcast(self, message_type: TORAPacketTypes, payload: GenericMessagePayload):
-        # TODO: Rethink the way packet creation and broadcasting is handled
+    def broadcast(self, message_type: TORAControlPacketTypes, payload: GenericMessagePayload):
         for destination in self.neighbors:
             header = TORAPacketHeader(message_type, self.componentinstancenumber, destination)
             message = GenericMessage(header, payload)
@@ -413,3 +427,4 @@ class TORANode(GenericModel):
 
     def set_height(self, height: TORAHeight):
         self.app_layer.height = height
+
