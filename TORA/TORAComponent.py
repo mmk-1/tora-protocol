@@ -80,9 +80,16 @@ class ApplicationLayerMessageMessagePayload(GenericMessagePayload):
 
 
 class RoutingTORAApplicationLayerComponent(GenericModel):
-    def __init__(self, componentname, componentinstancenumber):
-        super().__init__(componentname, componentinstancenumber)
-        self.neighbors = Topology().get_neighbors(componentinstancenumber)
+    def __init__(self, componentname, componentinstancenumber, topology: Topology):
+        '''
+        Each node i requires:
+        - Height
+        - Route-required flag
+        - Time of the last update (last time UPD was broadcast)
+        - Time when each link (i, j) became active
+        '''
+        super().__init__(componentname, componentinstancenumber, topology=topology)
+        self.neighbors = topology.get_neighbors(componentinstancenumber)
 
         self.height: TORAHeight = TORAHeight(
             None, None, None, None, self.componentinstancenumber
@@ -398,13 +405,14 @@ class RoutingTORAApplicationLayerComponent(GenericModel):
 
 
 class RoutingTORAComponent(GenericModel):
-    def __init__(self, componentname, componentid):
+    def __init__(self, componentname, componentid, topology: Topology):
         # SUBCOMPONENTS
+        super().__init__(componentname, componentid, topology=topology)
         self.appllayer = RoutingTORAApplicationLayerComponent(
-            "ApplicationLayer", componentid
+            "ApplicationLayer", componentid, topology
         )
-        self.netlayer = GenericNetworkLayer("NetworkLayer", componentid)
-        self.linklayer = GenericLinkLayer("LinkLayer", componentid)
+        self.netlayer = GenericNetworkLayer("NetworkLayer", componentid, topology=topology)
+        self.linklayer = GenericLinkLayer("LinkLayer", componentid, topology=topology)
         # self.failuredetect = GenericFailureDetector("FailureDetector", componentid)
 
         # CONNECTIONS AMONG SUBCOMPONENTS
@@ -419,7 +427,7 @@ class RoutingTORAComponent(GenericModel):
         self.linklayer.connect_me_to_component(ConnectorTypes.DOWN, self)
         self.connect_me_to_component(ConnectorTypes.UP, self.linklayer)
 
-        super().__init__(componentname, componentid)
+        # super().__init__(componentname, componentid)
 
     def on_init(self, eventobj: Event):
         pass
