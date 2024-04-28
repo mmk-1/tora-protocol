@@ -78,7 +78,7 @@ class ApplicationLayerMessageMessagePayload(GenericMessagePayload):
         self.message = message
 
 
-class RoutingTORAApplicationLayerComponent(GenericModel):
+class ApplicationLayerTORA(GenericModel):
     def __init__(self, componentname, componentinstancenumber, topology: Topology):
         '''
         Each node i requires:
@@ -397,11 +397,11 @@ class RoutingTORAApplicationLayerComponent(GenericModel):
                 benchmark_time = time.time()
 
 
-class RoutingTORAComponent(GenericModel):
+class TORANode(GenericModel):
     def __init__(self, componentname, componentid, topology: Topology):
         # SUBCOMPONENTS
         super().__init__(componentname, componentid, topology=topology)
-        self.appllayer = RoutingTORAApplicationLayerComponent(
+        self.appllayer = ApplicationLayerTORA(
             "ApplicationLayer", componentid, topology
         )
         self.netlayer = GenericNetworkLayer("NetworkLayer", componentid, topology=topology)

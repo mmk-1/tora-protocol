@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 from adhoccomputing.GenericModel import Topology
 
-from TORA.TORAComponent import RoutingTORAComponent, TORAHeight, heights, all_edges, wait_for_action_to_complete
+from TORA.TORAComponent import TORANode, TORAHeight, heights, all_edges, wait_for_action_to_complete
 
 def deterministic_test1():
     G = nx.Graph()
@@ -25,7 +25,7 @@ def deterministic_test1():
 
 
     topo = Topology()
-    topo.construct_from_graph(G, RoutingTORAComponent, GenericChannel)
+    topo.construct_from_graph(G, TORANode, GenericChannel)
     print(f"len: {len(topo.nodes)}")
     destination_id = 7
     source_id = 0
@@ -61,7 +61,7 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
     # plt.show()
 
     topo = Topology()
-    topo.construct_from_graph(G, RoutingTORAComponent, GenericChannel)
+    topo.construct_from_graph(G, TORANode, GenericChannel)
     # destination_id = 7
     # source_id = 0
     destination_height: TORAHeight = TORAHeight(0, 0, 0, 0, destination_id)
