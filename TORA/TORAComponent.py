@@ -435,11 +435,7 @@ class TORANode(GenericModel):
     def set_neighbour_height(self, j: int, height: TORAHeight):
         self.appllayer.set_neighbour_height(j, height)
 
-
-### Functions to get variables stored in nodes.
-### Used in visiualization.
-
-
+# Helper functions for testing
 def all_edges(topo: Topology):
     edges = []
     for node in topo.nodes:
@@ -450,16 +446,11 @@ def all_edges(topo: Topology):
 
     return edges
 
-
 def heights(topo: Topology):
     heights = []
     for node in topo.nodes:
         heights.append((node, topo.nodes[node].appllayer.height.delta))
     return heights
-
-
-### Functions used in benchmark
-
 
 def wait_for_action_to_complete():
     while time.time() - 0.25 < benchmark_time:
