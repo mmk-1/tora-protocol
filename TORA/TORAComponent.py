@@ -1,5 +1,6 @@
 import time
 from enum import Enum
+from threading import Lock
 from typing import Dict, Tuple, List
 
 from adhoccomputing.Experimentation.Topology import Topology
@@ -11,144 +12,124 @@ from adhoccomputing.Networking.NetworkLayer.GenericNetworkLayer import GenericNe
 # Types
 from adhoccomputing.Generics import GenericMessage, GenericMessageHeader, GenericMessagePayload
 
-class TORAControlPacketTypes(Enum):
-    QRY = "QUERY"
+INITIAL_TIME = 20000000000
+benchmark_time_lock: Lock = Lock()
+benchmark_time: float = 20000000000
+
+
+class ApplicationLayerMessageTypes(Enum):
     UPD = "UPDATE"
     CLR = "CLEAR"
+    QRY = "QUERY"
+    MSG = "MESSAGE"
+
 
 class TORAHeight:
     def __init__(self, tau: float, oid: int, r: int, delta: int, i: int):
-        # (tau, oid, r, delta, i)
-        self.tau = tau # Time of link failure
-        self.oid = oid # Originator ID (ID of node that defined new reference level)
-        self.r = r # Reflection bit
-        self.delta = delta # Number used for ordering
-        self.i = i # Unique ID of the node itself
+        self.tau = tau
+        self.oid = oid
+        self.r = r
+        self.delta = delta
+        self.i = i
 
-# Packet Structures
-class TORAPacketHeader(GenericMessageHeader):
+
+# define your own message header structure
+class ApplicationLayerMessageHeader(GenericMessageHeader):
     pass
 
 
 # define your own message payload structure
-class TORAPacketPayload(GenericMessagePayload):
+class ApplicationLayerMessagePayload(GenericMessagePayload):
     pass
 
 
-class TORAPacketQRYPayload(GenericMessagePayload):
-    def __init__(self, destination_id: int):
-        self.destination_id: int = destination_id
+class ApplicationLayerQueryMessagePayload(GenericMessagePayload):
+    did: int
+
+    def __init__(self, did: int):
+        self.did = did
 
 
-class TORAPacketCLRPayload(GenericMessagePayload):
-    def __init__(self, destination_id: int, reference_level: Tuple[int, int, int]):
-        self.destination_id = destination_id
-        # TODO: Create a ReferenceLevel class
-        self.reference_level: Tuple[int, int, int] = reference_level
+class ApplicationLayerClearMessagePayload(GenericMessagePayload):
+    did: int
+    reference: Tuple[int, int, int]
 
-class TORAPacketUPDPayload(GenericMessagePayload):
-    def __init__(self, destination_id: int, height: TORAHeight, link_reversal: bool):
-        self.destination_id: int = destination_id
-        self.height: TORAHeight = height
-        self.link_reversal: bool = link_reversal
+    def __init__(self, did: int, reference: Tuple[int, int, int]):
+        self.did = did
+        self.reference = reference
 
-# New Headers. Keep data in headers only!!!
-class ReferenceLevel:
-    def __init__(self, tau, oid, r):
-        self.tau = tau
-        self.oid = oid
-        self.r = r
 
-class TORAControlPacket(GenericMessage):
-    def __init__(self, header: GenericMessageHeader, payload: GenericMessagePayload):
-        self.header: GenericMessageHeader = header
-        self.payload: GenericMessagePayload = payload # None?
+class ApplicationLayerUpdateMessagePayload(GenericMessagePayload):
+    did: int
+    height: TORAHeight
+    link_reversal: bool
 
-class UPDHeader(GenericMessageHeader):
-    def __init__(self, destination_id: int, height: TORAHeight, link_reversal: bool):
-        self.destination_id: int = destination_id
-        self.height: TORAHeight = height
-        self.link_reversal: bool = link_reversal
+    def __init__(self, did: int, height: TORAHeight, link_reversal: bool):
+        self.did = did
+        self.height = height
+        self.link_reversal = link_reversal
 
-class CLRHeader(GenericMessageHeader):
-    def __init__(self, destination_id: int, reference_level: ReferenceLevel):
-        self.destination_id: int = destination_id
-        self.reference_level: ReferenceLevel = reference_level
 
-class QRYHeader(GenericMessageHeader):
-    def __init__(self, destination_id: int):
-        self.destination_id: int = destination_id
+class ApplicationLayerMessageMessagePayload(GenericMessagePayload):
+    did: int
+    message: str
 
-# Application layer component
-class TORAComponent(GenericModel):
-    def __init__(self, component_name: str, component_id: int, topology: Topology):
-        '''
-        Each node i requires:
-        - Height
-        - Route-required flag
-        - Time of the last update (last time UPD was broadcast)
-        - Time when each link (i, j) became active
-        '''
-        super().__init__(component_name, component_id, topology=topology)
+    def __init__(self, did: int, message: str):
+        self.did = did
+        self.message = message
 
-        self.neighbors = topology.get_neighbors(component_id)
-        self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
-        # Keep neighbor's heights
-        self.N: Dict[int, Tuple[TORAHeight, int]] = {}
+
+class RoutingTORAApplicationLayerComponent(GenericModel):
+    def __init__(self, componentname, componentinstancenumber):
+        super().__init__(componentname, componentinstancenumber)
+        self.neighbors = Topology().get_neighbors(componentinstancenumber)
+
+        self.height: TORAHeight = TORAHeight(
+            None, None, None, None, self.componentinstancenumber
+        )
+
         self.last_upd: int = 0
-        self.route_required: bool = False
+        self.rr: bool = 0
+        self.N: Dict[int, Tuple[TORAHeight, int]] = {}
+        self.lock: Lock = Lock()
 
     def on_init(self, eventobj: Event):
         pass
 
-    # When we receive a message
     def on_message_from_bottom(self, eventobj: Event):
-        message: GenericMessage = eventobj.eventcontent
-        header: GenericMessageHeader = message.header
+        self.update_time()
+        with self.lock:
+            try:
+                applmessage = eventobj.eventcontent
+                hdr = applmessage.header
+                payload: GenericMessagePayload = applmessage.payload
+                if hdr.messagetype == ApplicationLayerMessageTypes.QRY:
+                    print("GOT QRY")
+                    # print(payload.)
+                    self.handle_qry(payload.did, hdr.messagefrom)
+                elif hdr.messagetype == ApplicationLayerMessageTypes.UPD:
+                    self.handle_upd(
+                        payload.did,
+                        hdr.messagefrom,
+                        payload.height,
+                        payload.link_reversal,
+                    )
+                elif hdr.messagetype == ApplicationLayerMessageTypes.CLR:
+                    self.handle_clr(payload.did, payload.reference)
+                elif hdr.messagetype == ApplicationLayerMessageTypes.MSG:
+                    self.handle_msg(payload.did, payload.message)
+            except AttributeError:
+                print("Attribute Error")
+        self.update_time()
 
-        # Check type of message and handle it!
-        if header.messagetype == TORAControlPacketTypes.QRY:
-            self.handle_query(message)
-        elif header.messagetype == TORAControlPacketTypes.CLR:
-            pass
-        elif header.messagetype == TORAControlPacketTypes.UPD:
-            pass
-        else:
-            raise Exception("UNKNOWN MESSAGE TYPE!")
-
-    '''
-    Functions to handle the messages based on TORAMessageType
-    '''
-    def handle_query(self, message: GenericMessage):
-        # TODO: Make it return a boolean?
-        '''
-        QRY has a destination id (did)
-        '''
-        destination_id: int = message.payload.destination_id
-        source_id: int = message.header.messagefrom
+    def handle_qry(self, did: int, fromid: int):
         downstream_links = self.get_downstream_links()
 
-        ''' Excerpt from the paper:
-        (a) If the receiving node has no downstream links and its router-equired flag is un-set, it re-broadcasts 
-            the QRY packet and sets its route-required flag. 
-        
-        (b) If the receiving node has no downstream links and the route-required flag is set, it discards 
-            the QRY packet.
-            
-        (c) If the receiving node has at least one downstream link and its height is NULL, it sets its height to
-            Hi = (τj, oidj, rj, δj + 1, i), where HNi, j = (τj, oidj, rj, δj, j) is the minimum height of its 
-            non-NULL neighbors, and broadcasts an UPD packet.
-            
-        (d) If the receiving node has at least one downstream link and its height is non-NULL, it first compares the 
-            time the last UPD packet was broadcast to the time the link over which the QRY packet was received became 
-            active. If an UPD packet has been broadcast since the link became active , it discards the QRY packet; 
-            otherwise, it broadcasts an UPD packet. If a node has the route-required flag set when a new link is 
-            established, it broadcasts a QRY packet.
-        '''
         if len(downstream_links) == 0:
-            if self.route_required == 0:
-                self.broadcast_query_packet(destination_id)
-            return
+            if self.rr == 0:
+                self.broadcast_qry(did)
+            else:
+                pass
         elif self.height.delta is None:
             min_height = self.get_minimum_height_between_neighbours()
             self.height = TORAHeight(
@@ -158,43 +139,26 @@ class TORAComponent(GenericModel):
                 min_height.delta + 1,
                 self.componentinstancenumber,
             )
-            self.broadcast_upd_packet(destination_id, False)
-            return
-        elif source_id not in self.N or (
-            source_id in self.N and self.N[source_id][1] > self.last_upd
+            self.broadcast_upd(did, False)
+        elif fromid not in self.N or (
+            fromid in self.N and self.N[fromid][1] > self.last_upd
         ):
-            self.broadcast_upd_packet(destination_id, False)
-            return
-        # Discard
-        return
+            self.broadcast_upd(did, False)
+        else:
+            pass
 
-    def handle_update(self, message: GenericMessage):
-        source_id: int = message.header.messagefrom
-        destination_id: int = message.payload.destination_id
-        height: TORAHeight = message.payload.height
-        link_reversal: bool = message.payload.link_reversal
+    def handle_upd(self, did: int, from_id: int, height: TORAHeight, link_reversal: bool):
+        self.set_neighbour_height(from_id, height)
         downstream_links = self.get_downstream_links()
-        self.set_neighbour_height(source_id, height)
-        downstream_links = self.get_downstream_links()
-        '''Excerpt from paper:
-        node i first updates the entry HNi, j in its height array with the height contained in the received UPD packet 
-        and then reacts as follows:
-        
-        (a) If the route-required flag is set (which implies that the height of node i is NULL), node i sets 
-            its height to Hi = (τj, oidj, rj, δj + 1, i)—where HNi, j = (τj, oidj, rj, δj, j) is the minimum height 
-            of its non-NULL neighbors, updates all the entries in its link-state array LS, un-sets the route-required 
-            flag and then broadcasts an UPD packet which contains its new height. 
-        
-        (b) If the route-required flag is not set, node i simply updates the entry LSi, j in its link-state array.
-        
-        '''
 
         if link_reversal:
-
+            
             if len(downstream_links):
                 return
 
-            upstream_links: List[Tuple[TORAHeight, int]] = list(self.get_upstream_links().items())
+            upstream_links: List[Tuple[TORAHeight, int]] = list(
+                self.get_upstream_links().items()
+            )
             reference_level: TORAHeight = TORAHeight(-1, None, None, None, None)
             same_reference_level = True
 
@@ -203,16 +167,16 @@ class TORAComponent(GenericModel):
                 if reference_level == (-1, None, None):
                     reference_level = upstream_link
                 elif (
-                        upstream_link.tau != reference_level.tau
-                        or upstream_link.oid != reference_level.oid
-                        or upstream_link.r != reference_level.r
+                    upstream_link.tau != reference_level.tau
+                    or upstream_link.oid != reference_level.oid
+                    or upstream_link.r != reference_level.r
                 ):
                     same_reference_level = False
 
                 if (reference_level.tau, reference_level.oid, reference_level.r) >= (
-                        upstream_link.tau,
-                        upstream_link.oid,
-                        upstream_link.r,
+                    upstream_link.tau,
+                    upstream_link.oid,
+                    upstream_link.r,
                 ):
                     reference_level.tau = upstream_link.tau
                     reference_level.oid = upstream_link.oid
@@ -222,15 +186,15 @@ class TORAComponent(GenericModel):
                     )
 
             if not same_reference_level:
-                self.maintenance_case_2(destination_id, reference_level)
+                self.maintenance_case_2(did, reference_level)
             elif reference_level[2] == 0:
-                self.maintenance_case_3(destination_id, reference_level)
+                self.maintenance_case_3(did, reference_level)
             elif self.componentinstancenumber == reference_level[1]:
-                self.maintenance_case_4(destination_id)
+                self.maintenance_case_4(did)
             else:
-                self.maintenance_case_5(destination_id)
+                self.maintenance_case_5(did)
         else:
-            if self.route_required == 1:
+            if self.rr == 1:
                 min_height = self.get_minimum_height_between_neighbours()
                 self.height = TORAHeight(
                     min_height.tau,
@@ -240,58 +204,63 @@ class TORAComponent(GenericModel):
                     self.componentinstancenumber,
                 )
                 self.rr = 0
-                self.broadcast_upd_packet(destination_id, False)
+                self.broadcast_upd(did, False)
             else:
-                if len(downstream_links) == 0 and self.componentinstancenumber != destination_id:
-                    self.maintenance_case_1(destination_id)
+                if len(downstream_links) == 0 and self.componentinstancenumber != did:
+                    self.maintenance_case_1(did)
 
-    def handle_clear(self, message: GenericMessage):
-        destination_id: int = message.payload.destination_id
-        reference_level: Tuple[int, int, int] = message.payload.reference_level
-        # TODO: Double check the logic of this function
-        '''Excerpt from the paper:
-        
-        (a) If the reference level in the CLR packet matches the reference level of node i; it sets its height 
-            and the height entry for each neighbor j ∈ Ni to NULL (unless the destination is a neighbor, in which 
-            case the corresponding height entry is set to ZERO), updates all the entries in its link-state array LS 
-            and broadcasts a CLR packet. 
-        
-        (b) If the reference level in the CLR packet does not match the reference level of node i; it sets the height 
-            entry for each neighbor j ∈ Ni (with the same reference level as the CLR packet) to NULL and updates the 
-            corresponding link-state array entries. Thus the height of each node in the portion of the network which 
-            was partitioned is set to NULL and all invalid routes are erased. 
-            If (b) causes node i to lose its last downstream link, it reacts as in case 1 of maintaining routes.
-        
-        '''
-        if reference_level == (self.height.tau, self.height.oid, self.height.r):
+    def handle_clr(self, did: int, reference: Tuple[int, int, int]):
+        if reference == (self.height.tau, self.height.oid, self.height.r):
             self.height = TORAHeight(
                 None, None, None, None, self.componentinstancenumber
             )
 
         for neighbour in self.N:
-            if neighbour == destination_id:
+            if neighbour == did:
                 continue
-            if reference_level == (
+            if reference == (
                 self.height.tau,
                 self.height.oid,
                 self.height.r,
-            ) or reference_level == (
+            ) or reference == (
                 self.N[neighbour][0].tau,
                 self.N[neighbour][0].oid,
                 self.N[neighbour][0].r,
             ):
-                self.N[neighbour] = (None, None, None, None, self.componentinstancenumber)
-        if reference_level == (self.height.tau, self.height.oid, self.height.r):
-            self.broadcast_clr(destination_id, reference_level)
+                self.N[neighbour] = (
+                    None,
+                    None,
+                    None,
+                    None,
+                    self.componentinstancenumber,
+                )
+        if reference == (self.height.tau, self.height.oid, self.height.r):
+            self.broadcast_clr(did, reference)
 
-    '''
-    Helper functions for the 5 maintainence cases
-    1. Generate
-    2. Propagate
-    3. Reflect
-    4. Detect
-    5. Generate
-    '''
+    # TODO: To be studied further. Can we not use this?
+    def handle_msg(self, did: int, message: str):
+        print("HASLKDAJLSKDL")
+        if did == self.componentinstancenumber:
+            print(f"{self.componentinstancenumber} says: Got a message: {message}")
+        elif len(self.get_downstream_links()) == 0:
+            print(
+                f"{self.componentinstancenumber} says: Sorry I can't route this message :("
+            )
+        else:
+            min_neighbour = self.get_minimum_height_between_neighbours()
+            print(
+                f"{self.componentinstancenumber} says: Forwarding a message: {message}"
+            )
+            hdr = ApplicationLayerMessageHeader(
+                ApplicationLayerMessageTypes.MSG,
+                self.componentinstancenumber,
+                min_neighbour.i,
+            )
+            msg = GenericMessage(
+                hdr, ApplicationLayerMessageMessagePayload(did, message)
+            )
+            self.send_down(Event(self, EventTypes.MFRT, msg))
+
     def maintenance_case_1(self, did: int):
         upstream_links = self.get_upstream_links()
 
@@ -308,7 +277,7 @@ class TORAComponent(GenericModel):
                 self.componentinstancenumber,
             )
 
-        self.broadcast_upd_packet(did, True)
+        self.broadcast_upd(did, True)
 
     def maintenance_case_2(self, did: int, reference: TORAHeight):
         self.height = TORAHeight(
@@ -318,7 +287,7 @@ class TORAComponent(GenericModel):
             reference.delta - 1,
             self.componentinstancenumber,
         )
-        self.broadcast_upd_packet(did, True)
+        self.broadcast_upd(did, True)
 
     def maintenance_case_3(self, did: int, reference: TORAHeight):
         self.height = TORAHeight(
@@ -340,7 +309,7 @@ class TORAComponent(GenericModel):
                 self.componentinstancenumber,
             )
 
-        self.broadcast_clr_packet(did, (self.height.tau, self.height.oid, 1))
+        self.broadcast_clr(did, (self.height.tau, self.height.oid, 1))
 
     def maintenance_case_5(self, did: int):
         self.height = TORAHeight(
@@ -350,24 +319,7 @@ class TORAComponent(GenericModel):
             0,
             self.componentinstancenumber,
         )
-        self.broadcast_upd_packet(did, True)
-
-
-    # Helper functions
-    def set_neighbour_height(self, j: int, height: TORAHeight):
-        self.N[j] = (height, time.time())
-
-    def get_upstream_links(self):
-        height_delta = -1 if self.height.delta is None else self.height.delta
-        return dict(
-            filter(lambda link: link[1][0].delta >= height_delta, list(self.N.items()))
-        )
-
-    def get_downstream_links(self):
-        height_delta = 100000 if self.height.delta is None else self.height.delta
-        return dict(
-            filter(lambda link: link[1][0].delta < height_delta, list(self.N.items()))
-        )
+        self.broadcast_upd(did, True)
 
     def get_minimum_height_between_neighbours(self) -> TORAHeight:
         downstream_links = self.get_downstream_links()
@@ -383,48 +335,145 @@ class TORAComponent(GenericModel):
 
         return min_height
 
-    # Broadcast helpers
-    def broadcast_query_packet(self, destination_id: int):
-        self.route_required = True
-        payload: TORAPacketQRYPayload = TORAPacketQRYPayload(destination_id)
-        self.broadcast(TORAControlPacketTypes.QRY, payload)
+    def get_downstream_links(self):
+        height_delta = 100000 if self.height.delta is None else self.height.delta
+        return dict(
+            filter(lambda link: link[1][0].delta < height_delta, list(self.N.items()))
+        )
 
-    def broadcast_upd_packet(self, destination_id: int, link_reversal: bool):
+    def get_upstream_links(self):
+        height_delta = -1 if self.height.delta is None else self.height.delta
+        return dict(
+            filter(lambda link: link[1][0].delta >= height_delta, list(self.N.items()))
+        )
+
+    def broadcast_qry(self, did: int):
+        self.rr = 1
+        self.broadcast(
+            ApplicationLayerQueryMessagePayload(did), ApplicationLayerMessageTypes.QRY
+        )
+
+    def broadcast_upd(self, did: int, link_reversal: bool):
         self.last_upd = time.time()
-        payload: TORAPacketUPDPayload = TORAPacketUPDPayload(destination_id, self.height, link_reversal)
-        self.broadcast(TORAControlPacketTypes.UPD, payload)
+        self.broadcast(
+            ApplicationLayerUpdateMessagePayload(did, self.height, link_reversal),
+            ApplicationLayerMessageTypes.UPD,
+        )
 
-    def broadcast_clr_packet(self, destination_id: int, reference_level):
-        payload: TORAPacketCLRPayload = TORAPacketCLRPayload(destination_id, reference_level)
-        self.broadcast(TORAControlPacketTypes.CLR, payload)
+    def broadcast_clr(self, did: int, reference: Tuple[int, int, int]):
+        self.broadcast(
+            ApplicationLayerClearMessagePayload(did, reference),
+            ApplicationLayerMessageTypes.CLR,
+        )
 
-    def broadcast(self, message_type: TORAControlPacketTypes, payload: GenericMessagePayload):
+    def broadcast(
+        self, payload: GenericMessagePayload, t: ApplicationLayerMessageTypes
+    ):
+        print(f"Node-{self.componentinstancenumber} is broadcasting a {t} message")
         for destination in self.neighbors:
-            header = TORAPacketHeader(message_type, self.componentinstancenumber, destination)
-            message = GenericMessage(header, payload)
-            self.send_down(Event(self, EventTypes.MFRT, message))
-
-
-class TORANode(GenericModel):
-    def __init__(self, component_name: str, component_id: int, topology):
-        super().__init__(component_name, component_id, topology=topology)
-
-        self.app_layer: TORAComponent = TORAComponent(component_name, component_id, topology)
-        self.net_layer = GenericNetworkLayer("NetworkLayer", component_id, topology=topology)
-        self.link_layer = GenericLinkLayer("LinkLayer", component_id, topology=topology)
-
-        # CONNECTIONS AMONG SUBCOMPONENTS
-        self.app_layer.connect_me_to_component(ConnectorTypes.DOWN, self.net_layer)
-
-        self.net_layer.connect_me_to_component(ConnectorTypes.UP, self.app_layer)
-        self.net_layer.connect_me_to_component(ConnectorTypes.DOWN, self.link_layer)
-
-        self.link_layer.connect_me_to_component(ConnectorTypes.UP, self.net_layer)
-
-        # Connect the bottom component to the composite component....
-        self.link_layer.connect_me_to_component(ConnectorTypes.DOWN, self)
-        self.connect_me_to_component(ConnectorTypes.UP, self.link_layer)
+            hdr = ApplicationLayerMessageHeader(
+                t,
+                self.componentinstancenumber,
+                destination,
+            )
+            msg = GenericMessage(hdr, payload)
+            self.send_down(Event(self, EventTypes.MFRT, msg))
 
     def set_height(self, height: TORAHeight):
-        self.app_layer.height = height
+        self.height = height
 
+        for destination_neighbour in self.neighbors:
+            Topology().nodes[destination_neighbour].set_neighbour_height(
+                self.componentinstancenumber, height
+            )
+
+    def set_neighbour_height(self, j: int, height: TORAHeight):
+        self.N[j] = (height, time.time())
+
+    def update_time(self):
+        global benchmark_time
+        with benchmark_time_lock:
+            if benchmark_time < time.time() or benchmark_time == INITIAL_TIME:
+                benchmark_time = time.time()
+
+
+class RoutingTORAComponent(GenericModel):
+    def __init__(self, componentname, componentid):
+        # SUBCOMPONENTS
+        self.appllayer = RoutingTORAApplicationLayerComponent(
+            "ApplicationLayer", componentid
+        )
+        self.netlayer = GenericNetworkLayer("NetworkLayer", componentid)
+        self.linklayer = GenericLinkLayer("LinkLayer", componentid)
+        # self.failuredetect = GenericFailureDetector("FailureDetector", componentid)
+
+        # CONNECTIONS AMONG SUBCOMPONENTS
+        self.appllayer.connect_me_to_component(ConnectorTypes.DOWN, self.netlayer)
+        # self.failuredetect.connectMeToComponent(PortNames.DOWN, self.netlayer)
+        self.netlayer.connect_me_to_component(ConnectorTypes.UP, self.appllayer)
+        # self.netlayer.connectMeToComponent(PortNames.UP, self.failuredetect)
+        self.netlayer.connect_me_to_component(ConnectorTypes.DOWN, self.linklayer)
+        self.linklayer.connect_me_to_component(ConnectorTypes.UP, self.netlayer)
+
+        # Connect the bottom component to the composite component....
+        self.linklayer.connect_me_to_component(ConnectorTypes.DOWN, self)
+        self.connect_me_to_component(ConnectorTypes.UP, self.linklayer)
+
+        super().__init__(componentname, componentid)
+
+    def on_init(self, eventobj: Event):
+        pass
+
+    def on_message_from_top(self, eventobj: Event):
+        self.send_down(Event(self, EventTypes.MFRT, eventobj.eventcontent))
+
+    def on_message_from_bottom(self, eventobj: Event):
+        self.send_up(Event(self, EventTypes.MFRB, eventobj.eventcontent))
+
+    def init_route_creation(self, did: int):
+        self.appllayer.handle_qry(did, self.componentinstancenumber)
+
+    def set_height(self, height: TORAHeight):
+        self.appllayer.set_height(height)
+
+    def send_message(self, did: int, message: str):
+        self.appllayer.handle_msg(did, message)
+
+    def set_neighbour_height(self, j: int, height: TORAHeight):
+        self.appllayer.set_neighbour_height(j, height)
+
+
+### Functions to get variables stored in nodes.
+### Used in visiualization.
+
+
+def all_edges(topo: Topology):
+    edges = []
+    for node in topo.nodes:
+        downstream_links = topo.nodes[node].appllayer.get_downstream_links()
+
+        for i in list(downstream_links):
+            edges.append((node, i))
+
+    return edges
+
+
+def heights(topo: Topology):
+    heights = []
+    for node in topo.nodes:
+        heights.append((node, topo.nodes[node].appllayer.height.delta))
+    return heights
+
+
+### Functions used in benchmark
+
+
+def wait_for_action_to_complete():
+    while time.time() - 0.25 < benchmark_time:
+        time.sleep(0.25)
+    return benchmark_time
+
+
+def set_benchmark_time():
+    global benchmark_time
+    benchmark_time = INITIAL_TIME
