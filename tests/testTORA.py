@@ -33,10 +33,10 @@ def deterministic_test1():
     topo.start()
 
     t = time.time()
-    topo.nodes[destination_id].set_height(destination_height)
-    topo.nodes[source_id].init_route_creation(destination_id)
+    topo.nodes[destination_id].appllayer.set_height(destination_height)
+    # topo.nodes[source_id].init_route_creation(destination_id)
+    topo.nodes[source_id].appllayer.process_query_message(destination_id, source_id)
     print(wait_for_action_to_complete() - t)
-    # topo.nodes[source_id].send_message(destination_id, "Hey there! Test message")
 
 
     # DRAW Final DAG 
@@ -68,10 +68,11 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
     topo.start()
 
     t = time.time()
-    topo.nodes[destination_id].set_height(destination_height)
-    topo.nodes[source_id].init_route_creation(destination_id)
+    topo.nodes[destination_id].appllayer.set_height(destination_height)
+    # topo.nodes[source_id].init_route_creation(destination_id)
+    topo.nodes[source_id].appllayer.process_query_message(destination_id, source_id)
+
     print(wait_for_action_to_complete() - t)
-    # topo.nodes[source_id].send_message(destination_id, "Test message")
 
     G2 = nx.DiGraph()
     for node, height in heights(topo):
@@ -87,9 +88,9 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
         plt.savefig("FinalGraph.png")
 
 def main():
-    # deterministic_test1()
+    deterministic_test1()
     # random_test_by_graph_size(size=8, source_id=0, destination_id=7, save_graph=True)
-    random_test_by_graph_size(size=100, source_id=0, destination_id=99)
+    # random_test_by_graph_size(size=100, source_id=0, destination_id=99)
     
 
 if __name__ == "__main__":
