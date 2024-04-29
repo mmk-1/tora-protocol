@@ -17,7 +17,7 @@ benchmark_time_lock: Lock = Lock()
 benchmark_time: float = 20000000000
 
 
-class ApplicationLayerMessageTypes(Enum):
+class TORAControlMessageTypes(Enum):
     UPD = "UPDATE"
     CLR = "CLEAR"
     QRY = "QUERY"
@@ -31,53 +31,32 @@ class TORAHeight:
         self.delta = delta
         self.i = i
 
+class ReferenceLevel:
+    def __init__(self, tau: float, oid: int, r: int):
+        self.tau = tau
+        self.oid = oid
+        self.r = r
 
-# define your own message header structure
-class ApplicationLayerMessageHeader(GenericMessageHeader):
-    pass
-
-
-# define your own message payload structure
-class ApplicationLayerMessagePayload(GenericMessagePayload):
-    pass
-
-
-class ApplicationLayerQueryMessagePayload(GenericMessagePayload):
-    did: int
-
+# TORA Message Payloads
+class QueryMessagePayload(GenericMessagePayload):
     def __init__(self, did: int):
         self.did = did
 
 
-class ApplicationLayerClearMessagePayload(GenericMessagePayload):
-    did: int
-    reference: Tuple[int, int, int]
-
-    def __init__(self, did: int, reference: Tuple[int, int, int]):
+class ClearMessagePayload(GenericMessagePayload):
+    def __init__(self, did: int, reference: ReferenceLevel):
         self.did = did
-        self.reference = reference
+        self.reference: ReferenceLevel = reference
 
 
-class ApplicationLayerUpdateMessagePayload(GenericMessagePayload):
-    did: int
-    height: TORAHeight
-    link_reversal: bool
-
+class UpdateMessagePayload(GenericMessagePayload):
     def __init__(self, did: int, height: TORAHeight, link_reversal: bool):
         self.did = did
         self.height = height
         self.link_reversal = link_reversal
 
 
-class ApplicationLayerMessageMessagePayload(GenericMessagePayload):
-    did: int
-    message: str
-
-    def __init__(self, did: int, message: str):
-        self.did = did
-        self.message = message
-
-
+# The Application Layer for TORA
 class ApplicationLayerTORA(GenericModel):
     def __init__(self, componentname, componentinstancenumber, topology: Topology):
         '''
@@ -88,15 +67,12 @@ class ApplicationLayerTORA(GenericModel):
         - Time when each link (i, j) became active
         '''
         super().__init__(componentname, componentinstancenumber, topology=topology)
+        
         self.neighbors = topology.get_neighbors(componentinstancenumber)
-
-        self.height: TORAHeight = TORAHeight(
-            None, None, None, None, self.componentinstancenumber
-        )
-
+        self.height: TORAHeight = TORAHeight(None, None, None, None, self.componentinstancenumber)
         self.last_update: int = 0
         self.route_required: bool = 0
-        self.N: Dict[int, Tuple[TORAHeight, int]] = {}
+        self.neighbor_heights: Dict[int, Tuple[TORAHeight, int]] = {} # Neighbor heights
         self.lock: Lock = Lock()
 
     def on_init(self, eventobj: Event):
@@ -110,18 +86,18 @@ class ApplicationLayerTORA(GenericModel):
                 applmessage = eventobj.eventcontent
                 hdr = applmessage.header
                 payload: GenericMessagePayload = applmessage.payload
-                if hdr.messagetype == ApplicationLayerMessageTypes.QRY:
+                if hdr.messagetype == TORAControlMessageTypes.QRY:
                     print("GOT QRY")
                     # print(payload.)
                     self.process_query_message(payload.did, hdr.messagefrom)
-                elif hdr.messagetype == ApplicationLayerMessageTypes.UPD:
+                elif hdr.messagetype == TORAControlMessageTypes.UPD:
                     self.process_update_message(
                         payload.did,
                         hdr.messagefrom,
                         payload.height,
                         payload.link_reversal,
                     )
-                elif hdr.messagetype == ApplicationLayerMessageTypes.CLR:
+                elif hdr.messagetype == TORAControlMessageTypes.CLR:
                     self.process_clear_message(payload.did, payload.reference)
                 else:
                     raise Exception("Unkown message type")
@@ -151,7 +127,8 @@ class ApplicationLayerTORA(GenericModel):
 
         if len(downstream_links) == 0:
             if self.route_required == 0:
-                self.broadcast_query_message(did)
+                broadcaster = self.Broadcaster(self, TORAControlMessageTypes.QRY, self.componentinstancenumber, did)
+                broadcaster.broadcast()
             else:
                 pass
         elif self.height.delta is None:
@@ -163,11 +140,13 @@ class ApplicationLayerTORA(GenericModel):
                 min_height.delta + 1,
                 self.componentinstancenumber,
             )
-            self.broadcast_update_message(did, False)
-        elif fromid not in self.N or (
-            fromid in self.N and self.N[fromid][1] > self.last_update
+            broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=False)
+            broadcaster.broadcast()
+        elif fromid not in self.neighbor_heights or (
+            fromid in self.neighbor_heights and self.neighbor_heights[fromid][1] > self.last_update
         ):
-            self.broadcast_update_message(did, False)
+            broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=False)
+            broadcaster.broadcast()
         else:
             pass
 
@@ -220,106 +199,62 @@ class ApplicationLayerTORA(GenericModel):
         else:
             if self.route_required == 1:
                 min_height = self.find_minimum_neighbor_height()
-                self.height = TORAHeight(
-                    min_height.tau,
-                    min_height.oid,
-                    min_height.r,
-                    min_height.delta + 1,
-                    self.componentinstancenumber,
-                )
+                self.height = TORAHeight(min_height.tau,min_height.oid,min_height.r,min_height.delta + 1,self.componentinstancenumber)
                 self.route_required = 0
-                self.broadcast_update_message(did, False)
+                broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=False)
+                broadcaster.broadcast()
             else:
                 if len(downstream_links) == 0 and self.componentinstancenumber != did:
                     self.maintenance_case_1(did)
 
-    def process_clear_message(self, did: int, reference: Tuple[int, int, int]):
-        if reference == (self.height.tau, self.height.oid, self.height.r):
-            self.height = TORAHeight(
-                None, None, None, None, self.componentinstancenumber
-            )
+    def process_clear_message(self, destination_id: int, reference_level: ReferenceLevel):
+        if reference_level == (self.height.tau, self.height.oid, self.height.r):
+            self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
 
-        for neighbor in self.N:
-            if neighbor == did:
+        for neighbor in self.neighbor_heights:
+            if neighbor == destination_id:
                 continue
-            if reference == (
-                self.height.tau,
-                self.height.oid,
-                self.height.r,
-            ) or reference == (
-                self.N[neighbor][0].tau,
-                self.N[neighbor][0].oid,
-                self.N[neighbor][0].r,
-            ):
-                self.N[neighbor] = (
-                    None,
-                    None,
-                    None,
-                    None,
-                    self.componentinstancenumber,
-                )
-        if reference == (self.height.tau, self.height.oid, self.height.r):
-            self.broadcast_clear_message(did, reference)
+            if reference_level == (self.height.tau,self.height.oid,self.height.r,) or reference_level == (self.neighbor_heights[neighbor][0].tau,self.neighbor_heights[neighbor][0].oid,self.neighbor_heights[neighbor][0].r):
+                self.neighbor_heights[neighbor] = (None,None,None,None,self.componentinstancenumber)
+        if reference_level == (self.height.tau, self.height.oid, self.height.r):
+            broadcaster = self.Broadcaster(self, TORAControlMessageTypes.CLR, self.componentinstancenumber, destination_id=destination_id, reference_level=reference_level)
+            broadcaster.broadcast()
 
-    def maintenance_case_1(self, did: int):
+    def maintenance_case_1(self, destination_id: int):
         upstream_links = self.get_upstream_links()
-
         if len(upstream_links) == 0:
-            self.height = TORAHeight(
-                None, None, None, None, self.componentinstancenumber
-            )
+            self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
         else:
-            self.height = TORAHeight(
-                time.time(),
-                self.componentinstancenumber,
-                0,
-                0,
-                self.componentinstancenumber,
-            )
-
-        self.broadcast_update_message(did, True)
+            self.height = TORAHeight(time.time(),self.componentinstancenumber,0,0,self.componentinstancenumber)
+        broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=destination_id, height=self.height, link_reversal=True)
+        broadcaster.broadcast()
 
     def maintenance_case_2(self, did: int, reference: TORAHeight):
-        self.height = TORAHeight(
-            reference.tau,
-            reference.oid,
-            reference.r,
-            reference.delta - 1,
-            self.componentinstancenumber,
-        )
-        self.broadcast_update_message(did, True)
+        self.height = TORAHeight(reference.tau,reference.oid,reference.r,reference.delta - 1,self.componentinstancenumber)
+        broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=True)
+        broadcaster.broadcast()
 
     def maintenance_case_3(self, did: int, reference: TORAHeight):
         self.height = TORAHeight(
             reference.tau, reference.oid, 1, 0, self.componentinstancenumber
         )
-        self.broadcast_update_message(did, True)
+        broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=True)
+        broadcaster.broadcast()
 
     def maintenance_case_4(self, did: int):
         self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
 
-        for neighbor in self.N:
+        for neighbor in self.neighbor_heights:
             if neighbor == did:
                 continue
-            self.N[neighbor] = (
-                None,
-                None,
-                None,
-                None,
-                self.componentinstancenumber,
-            )
-
-        self.broadcast_clear_message(did, (self.height.tau, self.height.oid, 1))
+            self.neighbor_heights[neighbor] = (None,None,None,None,self.componentinstancenumber)
+        broadcaster = self.Broadcaster(self, TORAControlMessageTypes.CLR, self.componentinstancenumber, destination_id=did, reference_level=(self.height.tau, self.height.oid, 1))
+        broadcaster.broadcast()
 
     def maintenance_case_5(self, did: int):
-        self.height = TORAHeight(
-            time.time(),
-            self.componentinstancenumber,
-            0,
-            0,
-            self.componentinstancenumber,
-        )
-        self.broadcast_update_message(did, True)
+        self.height = TORAHeight(time.time(),self.componentinstancenumber,0,0,self.componentinstancenumber)
+        broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=True)
+        broadcaster.broadcast()
 
     def find_minimum_neighbor_height(self) -> TORAHeight:
         downstream_links = self.get_downstream_links()
@@ -337,57 +272,53 @@ class ApplicationLayerTORA(GenericModel):
 
     def get_downstream_links(self):
         height_delta = 100000 if self.height.delta is None else self.height.delta
-        return dict(
-            filter(lambda link: link[1][0].delta < height_delta, list(self.N.items()))
-        )
+        return dict(filter(lambda link: link[1][0].delta < height_delta, list(self.neighbor_heights.items())))
 
     def get_upstream_links(self):
         height_delta = -1 if self.height.delta is None else self.height.delta
-        return dict(
-            filter(lambda link: link[1][0].delta >= height_delta, list(self.N.items()))
-        )
-
-    def broadcast_query_message(self, did: int):
-        self.route_required = 1
-        self.broadcast(
-            ApplicationLayerQueryMessagePayload(did), ApplicationLayerMessageTypes.QRY
-        )
-
-    def broadcast_update_message(self, did: int, link_reversal: bool):
-        self.last_update = time.time()
-        self.broadcast(
-            ApplicationLayerUpdateMessagePayload(did, self.height, link_reversal),
-            ApplicationLayerMessageTypes.UPD,
-        )
-
-    def broadcast_clear_message(self, did: int, reference: Tuple[int, int, int]):
-        self.broadcast(
-            ApplicationLayerClearMessagePayload(did, reference),
-            ApplicationLayerMessageTypes.CLR,
-        )
-
-    def broadcast(self, payload: GenericMessagePayload, t: ApplicationLayerMessageTypes):
-        print(f"Node-{self.componentinstancenumber} is broadcasting a {t} message")
-        for destination in self.neighbors:
-            hdr = ApplicationLayerMessageHeader(t,self.componentinstancenumber,destination)
-            msg = GenericMessage(hdr, payload)
-            self.send_down(Event(self, EventTypes.MFRT, msg))
+        return dict(filter(lambda link: link[1][0].delta >= height_delta, list(self.neighbor_heights.items())))
 
     def set_height(self, height: TORAHeight):
         self.height = height
         for neighbor in self.neighbors:
-            self.topology.nodes[neighbor].appllayer.update_neighbor_height(
-                self.componentinstancenumber, height
-            )
+            self.topology.nodes[neighbor].appllayer.update_neighbor_height(self.componentinstancenumber, height)
 
     def update_neighbor_height(self, component_id: int, height: TORAHeight):
-        self.N[component_id] = (height, time.time())
+        self.neighbor_heights[component_id] = (height, time.time())
 
     def update_time(self):
         global benchmark_time
         with benchmark_time_lock:
             if benchmark_time < time.time() or benchmark_time == INITIAL_TIME:
                 benchmark_time = time.time()
+
+    # Sub component for broadcasting messages
+    class Broadcaster:
+        def __init__(self, tora_instance, message_type, source_id, destination_id=None, reference_level=None, link_reversal=None, height=None):
+            self.tora_instance = tora_instance
+            self.message_type = message_type
+            self.source_id = source_id
+            self.destination_id = destination_id
+            self.reference = reference_level
+            self.link_reversal = link_reversal
+            self.height = height
+        
+        def broadcast(self):
+            if self.message_type == TORAControlMessageTypes.QRY:
+                self.tora_instance.route_required = 1
+                payload = QueryMessagePayload(self.destination_id)
+            elif self.message_type == TORAControlMessageTypes.UPD:
+                self.tora_instance.last_update = time.time()
+                payload = UpdateMessagePayload(self.destination_id, self.height, self.link_reversal)
+            elif self.message_type == TORAControlMessageTypes.CLR:
+                payload = ClearMessagePayload(self.destination_id, self.reference)
+            else:
+                raise Exception("Unknown message type for broadcasting")
+
+            for neighbor in self.tora_instance.neighbors:
+                header = GenericMessageHeader(self.message_type, self.source_id, neighbor)
+                message = GenericMessage(header, payload)
+                self.tora_instance.send_down(Event(self.tora_instance, EventTypes.MFRT, message))
 
 
 class TORANode(GenericModel):
