@@ -68,9 +68,9 @@ class ApplicationLayerTORA(GenericModel):
         super().__init__(componentname, componentinstancenumber, topology=topology)
         self.neighbors = topology.get_neighbors(componentinstancenumber)
         self.height: TORAHeight = TORAHeight(None, None, None, None, self.componentinstancenumber)
-        self.last_update: int = 0
+        self.last_update = 0
         self.route_required: bool = False
-        self.neighbor_heights: Dict[int, Tuple[TORAHeight, int]] = {} # Neighbor heights
+        self.neighbor_heights: Dict[int, Tuple[TORAHeight, int]] = {}
         self.lock: Lock = Lock()
 
     def on_init(self, eventobj: Event):
@@ -81,21 +81,16 @@ class ApplicationLayerTORA(GenericModel):
         self.update_time()
         with self.lock:
             try:
-                applmessage = eventobj.eventcontent
-                hdr = applmessage.header
-                payload: GenericMessagePayload = applmessage.payload
-                if hdr.messagetype == TORAControlMessageTypes.QRY:
+                message = eventobj.eventcontent
+                header = message.header
+                payload: GenericMessagePayload = message.payload
+                if header.messagetype == TORAControlMessageTypes.QRY:
                     print("GOT QRY")
                     # print(payload.)
-                    self.process_query_message(payload.did, hdr.messagefrom)
-                elif hdr.messagetype == TORAControlMessageTypes.UPD:
-                    self.process_update_message(
-                        payload.did,
-                        hdr.messagefrom,
-                        payload.height,
-                        payload.link_reversal,
-                    )
-                elif hdr.messagetype == TORAControlMessageTypes.CLR:
+                    self.process_query_message(payload.did, header.messagefrom)
+                elif header.messagetype == TORAControlMessageTypes.UPD:
+                    self.process_update_message(payload.did,header.messagefrom,payload.height,payload.link_reversal)
+                elif header.messagetype == TORAControlMessageTypes.CLR:
                     self.process_clear_message(payload.did, payload.reference)
                 else:
                     raise Exception("Unkown message type")
@@ -131,18 +126,10 @@ class ApplicationLayerTORA(GenericModel):
                 pass
         elif self.height.delta is None:
             min_height = self.find_minimum_neighbor_height()
-            self.height = TORAHeight(
-                min_height.tau,
-                min_height.oid,
-                min_height.r,
-                min_height.delta + 1,
-                self.componentinstancenumber,
-            )
+            self.height = TORAHeight(min_height.tau,min_height.oid,min_height.r,min_height.delta + 1,self.componentinstancenumber)
             broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=False)
             broadcaster.broadcast()
-        elif fromid not in self.neighbor_heights or (
-            fromid in self.neighbor_heights and self.neighbor_heights[fromid][1] > self.last_update
-        ):
+        elif fromid not in self.neighbor_heights or (fromid in self.neighbor_heights and self.neighbor_heights[fromid][1] > self.last_update):
             broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=False)
             broadcaster.broadcast()
         else:
@@ -169,9 +156,7 @@ class ApplicationLayerTORA(GenericModel):
             if len(downstream_links):
                 return
 
-            upstream_links: List[Tuple[TORAHeight, int]] = list(
-                self.find_upstream_links().items()
-            )
+            upstream_links: List[Tuple[TORAHeight, int]] = list(self.find_upstream_links().items())
             reference_level: TORAHeight = TORAHeight(-1, None, None, None, None)
             same_reference_level = True
 
@@ -179,24 +164,14 @@ class ApplicationLayerTORA(GenericModel):
                 upstream_link = t[0]
                 if reference_level == (-1, None, None):
                     reference_level = upstream_link
-                elif (
-                    upstream_link.tau != reference_level.tau
-                    or upstream_link.oid != reference_level.oid
-                    or upstream_link.r != reference_level.r
-                ):
+                elif upstream_link.tau != reference_level.tau or upstream_link.oid != reference_level.oid or upstream_link.r != reference_level.r:
                     same_reference_level = False
 
-                if (reference_level.tau, reference_level.oid, reference_level.r) >= (
-                    upstream_link.tau,
-                    upstream_link.oid,
-                    upstream_link.r,
-                ):
+                if (reference_level.tau, reference_level.oid, reference_level.r) >= (upstream_link.tau, upstream_link.oid, upstream_link.r):
                     reference_level.tau = upstream_link.tau
                     reference_level.oid = upstream_link.oid
                     reference_level.r = upstream_link.r
-                    reference_level.delta = min(
-                        reference_level.delta, upstream_link.delta
-                    )
+                    reference_level.delta = min(reference_level.delta, upstream_link.delta)
 
             if not same_reference_level:
                 self.maintenance_case_2(did, reference_level)
@@ -285,7 +260,6 @@ class ApplicationLayerTORA(GenericModel):
 
         for i in list(downstream_links):
             downstream_link = downstream_links[i]
-
             if min_height_delta > downstream_link[0].delta + 1:
                 min_height = downstream_link[0]
                 min_height_delta = downstream_link[0].delta + 1
