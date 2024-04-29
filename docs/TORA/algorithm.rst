@@ -8,35 +8,76 @@
 Background and Related Work
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Present any background information survey the related work. Provide citations.
+Temporally-Ordered Routing Algorithm was originally proposed in [CITATION] by Vincent D. Park and M. Scott Corson. TORA is a distributed algorithm designed for mobile ad hoc networks to establish and maintain efficient routes in dynamic network environments. The algorithm is based on the concept of link reversal, where nodes maintain a logical link reversal hierarchy to facilitate routing decisions in response to topological changes.
 
 Distributed Algorithm: |TORA|
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An example distributed algorithm for broadcasting on an undirected graph is presented in  :ref:`Algorithm <BlindFloodingAlgorithmLabel>`.
+In the Temporally-Ordered Routing Algorithm (TORA), control packets play a crucial role in facilitating efficient routing in mobile wireless networks. TORA utilizes three main types of control packets: Query (QRY), Clear (CLR), and Update (UPD). When a node needs to establish or update a route to a destination, it broadcasts a Query (QRY) packet to its neighbors. Upon receiving a QRY packet, neighboring nodes determine their relative positions in the network and create a directed acyclic graph (DAG) based on this information. The DAG helps in establishing a logical link reversal hierarchy for routing decisions.
+
+The handling of control packets in TORA is based on the concept of link reversal. When a link failure occurs, the affected node broadcasts a Clear (CLR) packet to inform its neighbors about the failure. Neighboring nodes then propagate the CLR packet, triggering a process of link reversal to re-establish routes around the failed link. Additionally, Update (UPD) packets are used to disseminate information about changes in the network topology, ensuring that all nodes have up-to-date routing information.
+
+In TORA, the creation of a route involves the establishment of a directed acyclic graph (DAG) based on the relative positions of nodes in the network. This DAG helps in determining the logical link reversal hierarchy, which guides the routing decisions in response to topological changes. The algorithm ensures loop-free routes by utilizing the DAG structure and maintaining multiple routes for any given source/destination pair, enhancing the robustness of the routing process.
+
+TORA defines five cases for route maintenance to handle various scenarios in dynamic network environments:
+
+- Case 1 (Generate):
+This case occurs when a node loses its last downstream link to the destination.
+The node generates a new reference level and broadcasts it to its neighbors.
+By creating a new reference level, the node initiates the process of establishing a new route to the destination.
+
+- Case 2 (Propagate):
+In this case, a node has no downstream links due to a link reversal following the reception of an Update (UPD) packet.
+If the ordered sets of (tau, oid, r) are not equal for all neighbors, the node propagates the reference level of its highest neighbor.
+The node selects a height that is lower than all neighbors with that reference level, ensuring the establishment of a new route based on the propagated information.
+
+- Case 3 (Reflect):
+When a node has no downstream links due to a link reversal following the reception of an UPD packet and the ordered sets of (tau, oid, r) are equal for all neighbors, with r = 0.
+In this scenario, the node reflects back a higher sub-level, maintaining the consistency of the reference levels among neighbors.
+This action helps in maintaining the integrity of the routing hierarchy and ensuring efficient route establishment.
+
+- Case 4 (Detect):
+This case is triggered when a partition in the network is detected, indicating a significant topological change.
+Node i sets its height and the height entry for each neighbor to NULL, except when the destination is a neighbor, in which case the corresponding height entry is set to ZERO.
+All entries in the link-state array are updated, and a Clear (CLR) packet is broadcast to erase invalid routes and initiate the route re-establishment process.
+
+- Case 5 (Generate):
+Similar to Case 1, this case involves generating a new reference level when a node loses its last downstream link to the destination.
+The node creates a new reference level and broadcasts it to neighbors, initiating the process of establishing a new route to the destination.
+This action ensures that the routing hierarchy is maintained and that routes are efficiently re-established in response to topological changes.
 
 .. _BlindFloodingAlgorithmLabel:
 
 .. code-block:: RST
     :linenos:
-    :caption: Blind flooding algorithm.
+    :caption: Temporally-Ordered Routing Algorithm
     
 
-    Implements: BlindFlooding Instance: cf
-    Uses: LinkLayerBroadcast Instance: lbc
-    Events: Init, MessageFromTop, MessageFromBottom
-    Needs:
+    bool referenceLevelRecorded, reflectionBitSet[c] for all neighbors c of node i; 
+    referenceLevelQueue stateQueue[c] for all neighbors c of node i;
 
-    OnInit: () do
-    
-    OnMessageFromBottom: ( m ) do
-        Trigger lbc.Broadcast ( m )
-    
-    OnMessageFromTop: ( m ) do
-        Trigger lbc.Broadcast ( m )
+    If node i wants to initiate route maintenance 
+        perform procedure InitiateRouteMaintenance(i);
 
+    If node i receives a control message msg through an incoming channel c0
+        if referenceLevelRecorded = true and reflectionBitSet[c0] = false then 
+            stateQueue[c0] ← append(stateQueue[c0], msg);
+        end if
 
-Do not forget to explain the algorithm line by line in the text.
+    If node i receives ⟨reflection⟩ through an incoming channel c0
+        perform procedure InitiateRouteMaintenance(i);
+        reflectionBitSet[c0] ← true;
+        if reflectionBitSet[c] = true for all neighbors c of node i then
+            terminate; 
+        end if
+
+    Procedure InitiateRouteMaintenance(i)
+    if referenceLevelRecorded = false then
+        referenceLevelRecorded ← true;
+        send ⟨reflection⟩ into each outgoing channel of node i; 
+        take a local snapshot of the state of node i;
+    end if
+
 
 Example
 ~~~~~~~~
@@ -46,83 +87,14 @@ Provide an example for the distributed algorithm.
 Correctness
 ~~~~~~~~~~~
 
-Present Correctness, safety, liveness and fairness proofs.
+The correctness of TORA is ensured by its ability to establish loop-free routes, react to topological changes within a finite time, and maintain stable routing in dynamic network environments. Safety is guaranteed by the avoidance of routing loops, while liveness is achieved through timely reactions to link failures and recoveries. Fairness is maintained by treating all nodes equally in updating their routes based on received control packets.
 
 
 Complexity 
 ~~~~~~~~~~
 
-Present theoretic complexity results in terms of number of messages and computational complexity.
-
-
-
-
-.. admonition:: EXAMPLE 
-
-    Snapshot algorithms are fundamental tools in distributed systems, enabling the capture of consistent global states during system execution. These snapshots provide insights into the system's behavior, facilitating various tasks such as debugging, recovery from failures, and monitoring for properties like deadlock or termination. In this section, we delve into snapshot algorithms, focusing on two prominent ones: the Chandy-Lamport algorithm and the Lai-Yang algorithm. We will present the principles behind these algorithms, their implementation details, and compare their strengths and weaknesses.
-
-    **Chandy-Lamport Snapshot Algorithm:**
-
-    The Chandy-Lamport :ref:`Algorithm <ChandyLamportSnapshotAlgorithm>` [Lamport1985]_ , proposed by Leslie Lamport and K. Mani Chandy, aims to capture a consistent global state of a distributed system without halting its execution. It operates by injecting markers into the communication channels between processes, which propagate throughout the system, collecting local states as they traverse. Upon reaching all processes, these markers signify the completion of a global snapshot. This algorithm requires FIFO channels. There are no failures and all messages arrive intact and only once. Any process may initiate the snapshot algorithm. The snapshot algorithm does not interfere with the normal execution of the processes. Each process in the system records its local state and the state of its incoming channels.
-
-    1. **Marker Propagation:** When a process initiates a snapshot, it sends markers along its outgoing communication channels.
-    2. **Recording Local States:** Each process records its local state upon receiving a marker and continues forwarding it.
-    3. **Snapshot Construction:** When a process receives markers from all incoming channels, it captures its local state along with the incoming messages as a part of the global snapshot.
-    4. **Termination Detection:** The algorithm ensures that all markers have traversed the system, indicating the completion of the snapshot.
-
-
-    .. _ChandyLamportSnapshotAlgorithm:
-
-    .. code-block:: RST
-        :linenos:
-        :caption: Chandy-Lamport Snapshot Algorithm [Fokking2013]_.
-                
-        bool recordedp, markerp[c] for all incoming channels c of p; 
-        mess-queue statep[c] for all incoming channels c of p;
-
-        If p wants to initiate a snapshot 
-            perform procedure TakeSnapshotp;
-
-        If p receives a basic message m through an incoming channel c0
-        if recordedp = true and markerp[c0] = false then 
-            statep[c0] ← append(statep[c0],m);
-        end if
-
-        If p receives ⟨marker⟩ through an incoming channel c0
-            perform procedure TakeSnapshotp;
-            markerp[c0] ← true;
-            if markerp[c] = true for all incoming channels c of p then
-                terminate; 
-            end if
-
-        Procedure TakeSnapshotp
-        if recordedp = false then
-            recordedp ← true;
-            send ⟨marker⟩ into each outgoing channel of p; 
-            take a local snapshot of the state of p;
-        end if
-
-
-    **Example**
-
-    DRAW FIGURES REPRESENTING THE EXAMPLE AND EXPLAIN USING THE FIGURE. Imagine a distributed system with three processes, labeled Process A, Process B, and Process C, connected by communication channels. When Process A initiates a snapshot, it sends a marker along its outgoing channel. Upon receiving the marker, Process B marks its local state and forwards the marker to Process C. Similarly, Process C marks its state upon receiving the marker. As the marker propagates back through the channels, each process records the messages it sends or receives after marking its state. Finally, once the marker returns to Process A, it collects the markers and recorded states from all processes to construct a consistent global snapshot of the distributed system. This example demonstrates how the Chandy-Lamport algorithm captures a snapshot without halting the system's execution, facilitating analysis and debugging in distributed environments.
-
-
-    **Correctness:**
-    
-    *Termination (liveness)*: As each process initiates a snapshot and sends at most one marker message, the snapshot algorithm activity terminates within a finite timeframe. If process p has taken a snapshot by this point, and q is a neighbor of p, then q has also taken a snapshot. This is because the marker message sent by p has been received by q, prompting q to take a snapshot if it hadn't already done so. Since at least one process initiated the algorithm, at least one process has taken a snapshot; moreover, the network's connectivity ensures that all processes have taken a snapshot [Tel2001]_.
-
-    *Correctness*: We need to demonstrate that the resulting snapshot is feasible, meaning that each post-shot (basic) message is received during a post-shot event. Consider a post-shot message, denoted as m, sent from process p to process q. Before transmitting m, process p captured a local snapshot and dispatched a marker message to all its neighbors, including q. As the channels are FIFO (first-in-first-out), q received this marker message before receiving m. As per the algorithm's protocol, q took its snapshot upon receiving this marker message or earlier. Consequently, the receipt of m by q constitutes a post-shot event [Tel2001]_.
-
-    **Complexity:**
-
-    1. **Time Complexity**  The Chandy-Lamport :ref:`Algorithm <ChandyLamportSnapshotAlgorithm>` takes at most O(D) time units to complete where D is ...
-    2. **Message Complexity:** The Chandy-Lamport :ref:`Algorithm <ChandyLamportSnapshotAlgorithm>` requires 2|E| control messages.
-
-
-    **Lai-Yang Snapshot Algorithm:**
-
-    The Lai-Yang algorithm also captures a consistent global snapshot of a distributed system. Lai and Yang proposed a modification of Chandy-Lamport's algorithm for distributed snapshot on a network of processes where the channels need not be FIFO. ALGORTHM, FURTHER DETAILS
+1. Time Complexity The Temporally-Ordered Routing Algorithm takes at most O(2D) time units to complete where D is the diameter of the network (maximum number of nodes in the longest path).
+2. Space Complexity: The space complexity is O(D_d*A) where D_d is the number of maximum desired destinations and A is the average number of adjacent nodes.
 
 .. [Fokking2013] Wan Fokkink, Distributed Algorithms An Intuitive Approach, The MIT Press Cambridge, Massachusetts London, England, 2013
 .. [Tel2001] Gerard Tel, Introduction to Distributed Algorithms, CAMBRIDGE UNIVERSITY PRESS, 2001

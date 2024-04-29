@@ -5,6 +5,4 @@ Code Documentation
    :toctree: generated
    :recursive:
 
-   Snapshot.Snapshot
-   Snapshot.ChandyLamportSnapshot
-   Snapshot.LaiYangSnapshot
+   TORA.TORAComponent

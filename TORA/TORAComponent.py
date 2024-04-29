@@ -107,7 +107,7 @@ class ApplicationLayerTORA(GenericModel):
             the QRY packet.
             
         (c) If the receiving node has at least one downstream link and its height is NULL, it sets its height to
-            Hi = (τj, oidj, rj, δj + 1, i), where HNi, j = (τj, oidj, rj, δj, j) is the minimum height of its 
+            Hi = (tau_j, oidj, rj, delta_j + 1, i), where HNi, j = (tau_j, oidj, rj, delta_j, j) is the minimum height of its 
             non-NULL neighbors, and broadcasts an UPD packet.
             
         (d) If the receiving node has at least one downstream link and its height is non-NULL, it first compares the 
@@ -141,7 +141,7 @@ class ApplicationLayerTORA(GenericModel):
         and then reacts as follows:
         
         (a) If the route-required flag is set (which implies that the height of node i is NULL), node i sets 
-            its height to Hi = (τj, oidj, rj, δj + 1, i)—where HNi, j = (τj, oidj, rj, δj, j) is the minimum height 
+            its height to Hi = (tau_j, oidj, rj, delta_j + 1, i)—where HNi, j = (tau_j, oidj, rj, delta_j, j) is the minimum height 
             of its non-NULL neighbors, updates all the entries in its link-state array LS, un-sets the route-required 
             flag and then broadcasts an UPD packet which contains its new height. 
         
@@ -196,12 +196,12 @@ class ApplicationLayerTORA(GenericModel):
         '''Excerpt from the paper:
         
         (a) If the reference level in the CLR packet matches the reference level of node i; it sets its height 
-            and the height entry for each neighbor j ∈ Ni to NULL (unless the destination is a neighbor, in which 
+            and the height entry for each neighbor j "in" Ni to NULL (unless the destination is a neighbor, in which 
             case the corresponding height entry is set to ZERO), updates all the entries in its link-state array LS 
             and broadcasts a CLR packet. 
         
         (b) If the reference level in the CLR packet does not match the reference level of node i; it sets the height 
-            entry for each neighbor j ∈ Ni (with the same reference level as the CLR packet) to NULL and updates the 
+            entry for each neighbor j "in" Ni (with the same reference level as the CLR packet) to NULL and updates the 
             corresponding link-state array entries. Thus the height of each node in the portion of the network which 
             was partitioned is set to NULL and all invalid routes are erased. 
             If (b) causes node i to lose its last downstream link, it reacts as in case 1 of maintaining routes.
