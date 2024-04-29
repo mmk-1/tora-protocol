@@ -381,14 +381,13 @@ class ApplicationLayerTORA(GenericModel):
 
     def set_height(self, height: TORAHeight):
         self.height = height
-
-        for destination_neighbour in self.neighbors:
-            Topology().nodes[destination_neighbour].set_neighbour_height(
+        for neighbor in self.neighbors:
+            self.topology.nodes[neighbor].appllayer.set_neighbour_height(
                 self.componentinstancenumber, height
             )
 
-    def set_neighbour_height(self, j: int, height: TORAHeight):
-        self.N[j] = (height, time.time())
+    def set_neighbour_height(self, component_id: int, height: TORAHeight):
+        self.N[component_id] = (height, time.time())
 
     def update_time(self):
         global benchmark_time
@@ -399,20 +398,16 @@ class ApplicationLayerTORA(GenericModel):
 
 class TORANode(GenericModel):
     def __init__(self, componentname, componentid, topology: Topology):
-        # SUBCOMPONENTS
         super().__init__(componentname, componentid, topology=topology)
-        self.appllayer = ApplicationLayerTORA(
-            "ApplicationLayer", componentid, topology
-        )
+        
+        # SUBCOMPONENTS
+        self.appllayer = ApplicationLayerTORA("ApplicationLayer", componentid, topology)
         self.netlayer = GenericNetworkLayer("NetworkLayer", componentid, topology=topology)
         self.linklayer = GenericLinkLayer("LinkLayer", componentid, topology=topology)
-        # self.failuredetect = GenericFailureDetector("FailureDetector", componentid)
 
         # CONNECTIONS AMONG SUBCOMPONENTS
         self.appllayer.connect_me_to_component(ConnectorTypes.DOWN, self.netlayer)
-        # self.failuredetect.connectMeToComponent(PortNames.DOWN, self.netlayer)
         self.netlayer.connect_me_to_component(ConnectorTypes.UP, self.appllayer)
-        # self.netlayer.connectMeToComponent(PortNames.UP, self.failuredetect)
         self.netlayer.connect_me_to_component(ConnectorTypes.DOWN, self.linklayer)
         self.linklayer.connect_me_to_component(ConnectorTypes.UP, self.netlayer)
 
@@ -428,12 +423,6 @@ class TORANode(GenericModel):
 
     def on_message_from_bottom(self, eventobj: Event):
         self.send_up(Event(self, EventTypes.MFRB, eventobj.eventcontent))
-
-    def send_message(self, did: int, message: str):
-        self.appllayer.handle_msg(did, message)
-
-    def set_neighbour_height(self, j: int, height: TORAHeight):
-        self.appllayer.set_neighbour_height(j, height)
 
 # Helper functions for testing
 def all_edges(topo: Topology):
