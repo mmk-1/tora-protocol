@@ -13,9 +13,9 @@ from adhoccomputing.Networking.NetworkLayer.GenericNetworkLayer import GenericNe
 # Types
 from adhoccomputing.Generics import GenericMessage, GenericMessageHeader, GenericMessagePayload
 
-INITIAL_TIME = 20000000000
+INITIAL_TIME = float('inf')
 benchmark_time_lock: Lock = Lock()
-benchmark_time: float = 20000000000
+benchmark_time: float = float('inf')
 
 class TORAHeight:
     def __init__(self, tau: float, oid: int, r: int, delta: int, i: int):
@@ -85,7 +85,7 @@ class ApplicationLayerTORA(GenericModel):
                 header = message.header
                 payload: GenericMessagePayload = message.payload
                 if header.messagetype == TORAControlMessageTypes.QRY:
-                    print("GOT QRY")
+                    # print("GOT QRY")
                     # print(payload.)
                     self.process_query_message(payload.did, header.messagefrom)
                 elif header.messagetype == TORAControlMessageTypes.UPD:
@@ -267,7 +267,7 @@ class ApplicationLayerTORA(GenericModel):
         return min_height
 
     def find_downstream_links(self):
-        height_delta = 100000 if self.height.delta is None else self.height.delta
+        height_delta: int = float('inf') if self.height.delta is None else self.height.delta
         return dict(filter(lambda link: link[1][0].delta < height_delta, list(self.neighbor_heights.items())))
 
     def find_upstream_links(self):
