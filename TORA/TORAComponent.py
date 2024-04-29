@@ -155,7 +155,7 @@ class ApplicationLayerTORA(GenericModel):
             else:
                 pass
         elif self.height.delta is None:
-            min_height = self.get_minimum_height_between_neighbours()
+            min_height = self.find_minimum_neighbor_height()
             self.height = TORAHeight(
                 min_height.tau,
                 min_height.oid,
@@ -172,7 +172,7 @@ class ApplicationLayerTORA(GenericModel):
             pass
 
     def process_update_message(self, did: int, from_id: int, height: TORAHeight, link_reversal: bool):
-        self.set_neighbour_height(from_id, height)
+        self.update_neighbor_height(from_id, height)
         downstream_links = self.get_downstream_links()
 
         if link_reversal:
@@ -219,7 +219,7 @@ class ApplicationLayerTORA(GenericModel):
                 self.maintenance_case_5(did)
         else:
             if self.route_required == 1:
-                min_height = self.get_minimum_height_between_neighbours()
+                min_height = self.find_minimum_neighbor_height()
                 self.height = TORAHeight(
                     min_height.tau,
                     min_height.oid,
@@ -239,19 +239,19 @@ class ApplicationLayerTORA(GenericModel):
                 None, None, None, None, self.componentinstancenumber
             )
 
-        for neighbour in self.N:
-            if neighbour == did:
+        for neighbor in self.N:
+            if neighbor == did:
                 continue
             if reference == (
                 self.height.tau,
                 self.height.oid,
                 self.height.r,
             ) or reference == (
-                self.N[neighbour][0].tau,
-                self.N[neighbour][0].oid,
-                self.N[neighbour][0].r,
+                self.N[neighbor][0].tau,
+                self.N[neighbor][0].oid,
+                self.N[neighbor][0].r,
             ):
-                self.N[neighbour] = (
+                self.N[neighbor] = (
                     None,
                     None,
                     None,
@@ -298,10 +298,10 @@ class ApplicationLayerTORA(GenericModel):
     def maintenance_case_4(self, did: int):
         self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
 
-        for neighbour in self.N:
-            if neighbour == did:
+        for neighbor in self.N:
+            if neighbor == did:
                 continue
-            self.N[neighbour] = (
+            self.N[neighbor] = (
                 None,
                 None,
                 None,
@@ -321,7 +321,7 @@ class ApplicationLayerTORA(GenericModel):
         )
         self.broadcast_update_message(did, True)
 
-    def get_minimum_height_between_neighbours(self) -> TORAHeight:
+    def find_minimum_neighbor_height(self) -> TORAHeight:
         downstream_links = self.get_downstream_links()
         min_height = downstream_links[list(downstream_links)[0]][0]
         min_height_delta = min_height.delta
@@ -366,27 +366,21 @@ class ApplicationLayerTORA(GenericModel):
             ApplicationLayerMessageTypes.CLR,
         )
 
-    def broadcast(
-        self, payload: GenericMessagePayload, t: ApplicationLayerMessageTypes
-    ):
+    def broadcast(self, payload: GenericMessagePayload, t: ApplicationLayerMessageTypes):
         print(f"Node-{self.componentinstancenumber} is broadcasting a {t} message")
         for destination in self.neighbors:
-            hdr = ApplicationLayerMessageHeader(
-                t,
-                self.componentinstancenumber,
-                destination,
-            )
+            hdr = ApplicationLayerMessageHeader(t,self.componentinstancenumber,destination)
             msg = GenericMessage(hdr, payload)
             self.send_down(Event(self, EventTypes.MFRT, msg))
 
     def set_height(self, height: TORAHeight):
         self.height = height
         for neighbor in self.neighbors:
-            self.topology.nodes[neighbor].appllayer.set_neighbour_height(
+            self.topology.nodes[neighbor].appllayer.update_neighbor_height(
                 self.componentinstancenumber, height
             )
 
-    def set_neighbour_height(self, component_id: int, height: TORAHeight):
+    def update_neighbor_height(self, component_id: int, height: TORAHeight):
         self.N[component_id] = (height, time.time())
 
     def update_time(self):
