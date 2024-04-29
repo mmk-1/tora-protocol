@@ -1,5 +1,6 @@
 import networkx as nx
 import time
+import threading
 from adhoccomputing.Networking.LogicalChannels.GenericChannel import GenericChannel
 from matplotlib import pyplot as plt
 
@@ -8,48 +9,52 @@ from adhoccomputing.GenericModel import Topology
 from TORA.TORAComponent import TORANode, TORAHeight, heights, all_edges, wait_for_action_to_complete
 
 def deterministic_test1():
-    G = nx.Graph()
+    graph = nx.Graph()
 
-    G.add_edge(0, 1)
-    G.add_edge(0, 7)
-    G.add_edge(0, 3)
-    G.add_edge(1, 6)
-    G.add_edge(6, 5)
-    G.add_edge(6, 4)
-    G.add_edge(4, 2)
+    graph.add_edge(0, 1)
+    graph.add_edge(0, 7)
+    graph.add_edge(0, 3)
+    graph.add_edge(1, 6)
+    graph.add_edge(6, 5)
+    graph.add_edge(6, 4)
+    graph.add_edge(4, 2)
 
     # nx.draw(G, with_labels=True, font_weight="bold")
     # plt.draw()
     # plt.show()
     # plt.savefig("InitialGraph.png")
 
+    # print(f"Threads count 1: {threading.active_count()}")
 
     topo = Topology()
-    topo.construct_from_graph(G, TORANode, GenericChannel)
+    topo.construct_from_graph(graph, TORANode, GenericChannel)
+    
+
     print(f"len: {len(topo.nodes)}")
     destination_id = 7
     source_id = 0
     destination_height: TORAHeight = TORAHeight(0, 0, 0, 0, destination_id)
+    
     topo.start()
-
+    
     t = time.time()
-    topo.nodes[destination_id].appllayer.set_height(destination_height)
+    topo.nodes[destination_id].app_layer.set_height(destination_height)
     # topo.nodes[source_id].init_route_creation(destination_id)
-    topo.nodes[source_id].appllayer.process_query_message(destination_id, source_id)
+    topo.nodes[source_id].app_layer.process_query_message(destination_id, source_id)
     print(wait_for_action_to_complete() - t)
 
 
     # DRAW Final DAG 
-    G2 = nx.DiGraph()
+    dag = nx.DiGraph()
     print(len(heights(topo)))
     print(heights(topo))
     for node, height in heights(topo):
-        G2.add_node(node, label=height)
+        dag.add_node(node, label=height)
     edges = all_edges(topo)
-    G2.add_edges_from(edges)
+    dag.add_edges_from(edges)
     print(f"edges: {edges}")
 
-    nx.draw(G2, with_labels=True, font_weight="bold", arrows=True)
+    nx.draw(dag, with_labels=True, font_weight="bold", arrows=True)
     plt.draw()
     # plt.show()
     plt.savefig("FinalGraph.png")
@@ -68,9 +73,9 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
     topo.start()
 
     t = time.time()
-    topo.nodes[destination_id].appllayer.set_height(destination_height)
+    topo.nodes[destination_id].app_layer.set_height(destination_height)
     # topo.nodes[source_id].init_route_creation(destination_id)
-    topo.nodes[source_id].appllayer.process_query_message(destination_id, source_id)
+    topo.nodes[source_id].app_layer.process_query_message(destination_id, source_id)
 
     print(wait_for_action_to_complete() - t)
 

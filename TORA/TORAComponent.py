@@ -1,6 +1,7 @@
 import time
 from enum import Enum
 from threading import Lock
+import threading
 from typing import Dict, Tuple, List
 
 from adhoccomputing.Experimentation.Topology import Topology
@@ -16,13 +17,6 @@ INITIAL_TIME = 20000000000
 benchmark_time_lock: Lock = Lock()
 benchmark_time: float = 20000000000
 
-
-class TORAControlMessageTypes(Enum):
-    UPD = "UPDATE"
-    CLR = "CLEAR"
-    QRY = "QUERY"
-
-
 class TORAHeight:
     def __init__(self, tau: float, oid: int, r: int, delta: int, i: int):
         self.tau = tau
@@ -37,7 +31,12 @@ class ReferenceLevel:
         self.oid = oid
         self.r = r
 
-# TORA Message Payloads
+# TORA message types & payloads
+class TORAControlMessageTypes(Enum):
+    UPD = "UPDATE"
+    CLR = "CLEAR"
+    QRY = "QUERY"
+
 class QueryMessagePayload(GenericMessagePayload):
     def __init__(self, did: int):
         self.did = did
@@ -67,11 +66,10 @@ class ApplicationLayerTORA(GenericModel):
         - Time when each link (i, j) became active
         '''
         super().__init__(componentname, componentinstancenumber, topology=topology)
-        
         self.neighbors = topology.get_neighbors(componentinstancenumber)
         self.height: TORAHeight = TORAHeight(None, None, None, None, self.componentinstancenumber)
         self.last_update: int = 0
-        self.route_required: bool = 0
+        self.route_required: bool = False
         self.neighbor_heights: Dict[int, Tuple[TORAHeight, int]] = {} # Neighbor heights
         self.lock: Lock = Lock()
 
@@ -123,10 +121,10 @@ class ApplicationLayerTORA(GenericModel):
             otherwise, it broadcasts an UPD packet. If a node has the route-required flag set when a new link is 
             established, it broadcasts a QRY packet.
         '''
-        downstream_links = self.get_downstream_links()
+        downstream_links = self.find_downstream_links()
 
         if len(downstream_links) == 0:
-            if self.route_required == 0:
+            if self.route_required == False:
                 broadcaster = self.Broadcaster(self, TORAControlMessageTypes.QRY, self.componentinstancenumber, did)
                 broadcaster.broadcast()
             else:
@@ -151,8 +149,20 @@ class ApplicationLayerTORA(GenericModel):
             pass
 
     def process_update_message(self, did: int, from_id: int, height: TORAHeight, link_reversal: bool):
+        '''Excerpt from paper:
+        node i first updates the entry HNi, j in its height array with the height contained in the received UPD packet 
+        and then reacts as follows:
+        
+        (a) If the route-required flag is set (which implies that the height of node i is NULL), node i sets 
+            its height to Hi = (τj, oidj, rj, δj + 1, i)—where HNi, j = (τj, oidj, rj, δj, j) is the minimum height 
+            of its non-NULL neighbors, updates all the entries in its link-state array LS, un-sets the route-required 
+            flag and then broadcasts an UPD packet which contains its new height. 
+        
+        (b) If the route-required flag is not set, node i simply updates the entry LSi, j in its link-state array.
+        
+        '''
         self.update_neighbor_height(from_id, height)
-        downstream_links = self.get_downstream_links()
+        downstream_links = self.find_downstream_links()
 
         if link_reversal:
             
@@ -160,7 +170,7 @@ class ApplicationLayerTORA(GenericModel):
                 return
 
             upstream_links: List[Tuple[TORAHeight, int]] = list(
-                self.get_upstream_links().items()
+                self.find_upstream_links().items()
             )
             reference_level: TORAHeight = TORAHeight(-1, None, None, None, None)
             same_reference_level = True
@@ -197,10 +207,10 @@ class ApplicationLayerTORA(GenericModel):
             else:
                 self.maintenance_case_5(did)
         else:
-            if self.route_required == 1:
+            if self.route_required == True:
                 min_height = self.find_minimum_neighbor_height()
                 self.height = TORAHeight(min_height.tau,min_height.oid,min_height.r,min_height.delta + 1,self.componentinstancenumber)
-                self.route_required = 0
+                self.route_required = False
                 broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=False)
                 broadcaster.broadcast()
             else:
@@ -208,6 +218,20 @@ class ApplicationLayerTORA(GenericModel):
                     self.maintenance_case_1(did)
 
     def process_clear_message(self, destination_id: int, reference_level: ReferenceLevel):
+        '''Excerpt from the paper:
+        
+        (a) If the reference level in the CLR packet matches the reference level of node i; it sets its height 
+            and the height entry for each neighbor j ∈ Ni to NULL (unless the destination is a neighbor, in which 
+            case the corresponding height entry is set to ZERO), updates all the entries in its link-state array LS 
+            and broadcasts a CLR packet. 
+        
+        (b) If the reference level in the CLR packet does not match the reference level of node i; it sets the height 
+            entry for each neighbor j ∈ Ni (with the same reference level as the CLR packet) to NULL and updates the 
+            corresponding link-state array entries. Thus the height of each node in the portion of the network which 
+            was partitioned is set to NULL and all invalid routes are erased. 
+            If (b) causes node i to lose its last downstream link, it reacts as in case 1 of maintaining routes.
+        
+        '''
         if reference_level == (self.height.tau, self.height.oid, self.height.r):
             self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
 
@@ -221,7 +245,7 @@ class ApplicationLayerTORA(GenericModel):
             broadcaster.broadcast()
 
     def maintenance_case_1(self, destination_id: int):
-        upstream_links = self.get_upstream_links()
+        upstream_links = self.find_upstream_links()
         if len(upstream_links) == 0:
             self.height = TORAHeight(None, None, None, None, self.componentinstancenumber)
         else:
@@ -235,9 +259,7 @@ class ApplicationLayerTORA(GenericModel):
         broadcaster.broadcast()
 
     def maintenance_case_3(self, did: int, reference: TORAHeight):
-        self.height = TORAHeight(
-            reference.tau, reference.oid, 1, 0, self.componentinstancenumber
-        )
+        self.height = TORAHeight(reference.tau, reference.oid, 1, 0, self.componentinstancenumber)
         broadcaster = self.Broadcaster(self, TORAControlMessageTypes.UPD, self.componentinstancenumber, destination_id=did, height=self.height, link_reversal=True)
         broadcaster.broadcast()
 
@@ -257,7 +279,7 @@ class ApplicationLayerTORA(GenericModel):
         broadcaster.broadcast()
 
     def find_minimum_neighbor_height(self) -> TORAHeight:
-        downstream_links = self.get_downstream_links()
+        downstream_links = self.find_downstream_links()
         min_height = downstream_links[list(downstream_links)[0]][0]
         min_height_delta = min_height.delta
 
@@ -270,18 +292,18 @@ class ApplicationLayerTORA(GenericModel):
 
         return min_height
 
-    def get_downstream_links(self):
+    def find_downstream_links(self):
         height_delta = 100000 if self.height.delta is None else self.height.delta
         return dict(filter(lambda link: link[1][0].delta < height_delta, list(self.neighbor_heights.items())))
 
-    def get_upstream_links(self):
+    def find_upstream_links(self):
         height_delta = -1 if self.height.delta is None else self.height.delta
         return dict(filter(lambda link: link[1][0].delta >= height_delta, list(self.neighbor_heights.items())))
 
     def set_height(self, height: TORAHeight):
         self.height = height
         for neighbor in self.neighbors:
-            self.topology.nodes[neighbor].appllayer.update_neighbor_height(self.componentinstancenumber, height)
+            self.topology.nodes[neighbor].app_layer.update_neighbor_height(self.componentinstancenumber, height)
 
     def update_neighbor_height(self, component_id: int, height: TORAHeight):
         self.neighbor_heights[component_id] = (height, time.time())
@@ -324,21 +346,21 @@ class ApplicationLayerTORA(GenericModel):
 class TORANode(GenericModel):
     def __init__(self, componentname, componentid, topology: Topology):
         super().__init__(componentname, componentid, topology=topology)
-        
+
         # SUBCOMPONENTS
-        self.appllayer = ApplicationLayerTORA("ApplicationLayer", componentid, topology)
-        self.netlayer = GenericNetworkLayer("NetworkLayer", componentid, topology=topology)
-        self.linklayer = GenericLinkLayer("LinkLayer", componentid, topology=topology)
+        self.app_layer = ApplicationLayerTORA("ApplicationLayer", componentid, topology)
+        self.net_layer = GenericNetworkLayer("NetworkLayer", componentid, topology=topology)
+        self.link_layer = GenericLinkLayer("LinkLayer", componentid, topology=topology)
 
         # CONNECTIONS AMONG SUBCOMPONENTS
-        self.appllayer.connect_me_to_component(ConnectorTypes.DOWN, self.netlayer)
-        self.netlayer.connect_me_to_component(ConnectorTypes.UP, self.appllayer)
-        self.netlayer.connect_me_to_component(ConnectorTypes.DOWN, self.linklayer)
-        self.linklayer.connect_me_to_component(ConnectorTypes.UP, self.netlayer)
+        self.app_layer.connect_me_to_component(ConnectorTypes.DOWN, self.net_layer)
+        self.net_layer.connect_me_to_component(ConnectorTypes.UP, self.app_layer)
+        self.net_layer.connect_me_to_component(ConnectorTypes.DOWN, self.link_layer)
+        self.link_layer.connect_me_to_component(ConnectorTypes.UP, self.net_layer)
 
         # Connect the bottom component to the composite component....
-        self.linklayer.connect_me_to_component(ConnectorTypes.DOWN, self)
-        self.connect_me_to_component(ConnectorTypes.UP, self.linklayer)
+        self.link_layer.connect_me_to_component(ConnectorTypes.DOWN, self)
+        self.connect_me_to_component(ConnectorTypes.UP, self.link_layer)
 
     def on_init(self, eventobj: Event):
         pass
@@ -353,7 +375,7 @@ class TORANode(GenericModel):
 def all_edges(topo: Topology):
     edges = []
     for node in topo.nodes:
-        downstream_links = topo.nodes[node].appllayer.get_downstream_links()
+        downstream_links = topo.nodes[node].app_layer.find_downstream_links()
 
         for i in list(downstream_links):
             edges.append((node, i))
@@ -363,7 +385,7 @@ def all_edges(topo: Topology):
 def heights(topo: Topology):
     heights = []
     for node in topo.nodes:
-        heights.append((node, topo.nodes[node].appllayer.height.delta))
+        heights.append((node, topo.nodes[node].app_layer.height.delta))
     return heights
 
 def wait_for_action_to_complete():
