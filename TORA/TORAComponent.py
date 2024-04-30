@@ -345,6 +345,9 @@ class TORANode(GenericModel):
     def on_message_from_bottom(self, eventobj: Event):
         self.send_up(Event(self, EventTypes.MFRB, eventobj.eventcontent))
 
+    # def reset_benchmark_time(self):
+    #     set_benchmark_time()
+
 # Helper functions for testing
 def all_edges(topo: Topology):
     edges = []

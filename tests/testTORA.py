@@ -1,5 +1,6 @@
 import networkx as nx
 import time
+import sys, os
 import threading
 from adhoccomputing.Networking.LogicalChannels.GenericChannel import GenericChannel
 from matplotlib import pyplot as plt
@@ -58,6 +59,8 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
     # nx.draw(G, with_labels=True, font_weight="bold")
     # plt.draw()
     # plt.show()
+
+
     time_list = []
     graph_construction_time = time.time()
     print("Graph size: ", graph.number_of_nodes())
@@ -83,15 +86,16 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
         dag.add_node(node, label=height)
     edges = all_edges(topology)
     dag.add_edges_from(edges)
-    # print(edges)
 
     if save_graph:
         nx.draw(dag, with_labels=True, font_weight="bold", arrows=True)
         plt.draw()
         # plt.show()
-        plt.savefig("FinalGraph.png")
+        figures_dir = "/workspace/tests/figures"
+        plt.savefig(f"{figures_dir}/FinalGraph.png")
 
 def main():
+    # setAHCLogLevel(DEBUG)
     # deterministic_test1()
     # random_test_by_graph_size(size=8, source_id=0, destination_id=7, save_graph=True)
     random_test_by_graph_size(size=200, source_id=0, destination_id=99)
