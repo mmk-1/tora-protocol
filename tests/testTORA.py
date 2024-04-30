@@ -40,6 +40,7 @@ def deterministic_test1():
     topology.nodes[destination_id].app_layer.set_height(destination_height)
     topology.nodes[source_id].app_layer.process_query_message(destination_id, source_id)
     print(wait_for_action_to_complete() - t)
+    topology.nodes[source_id].app_layer.process_arbitrary_message(destination_id, "Test message")
 
 
     # DRAW Final DAG 
@@ -54,12 +55,8 @@ def deterministic_test1():
     # plt.show()
     plt.savefig("FinalGraph.png")
 
-def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=False):
+def random_test_by_graph_size(size, destination_id=7, source_id=0):
     graph = nx.random_tree(size)
-    # nx.draw(G, with_labels=True, font_weight="bold")
-    # plt.draw()
-    # plt.show()
-
 
     time_list = []
     graph_construction_time = time.time()
@@ -80,27 +77,14 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0, save_graph=Fa
     print(f"Routing done. Time to complete: {end_time - start_time}")
     time_list.append(end_time - start_time)
     
-
-    dag = nx.DiGraph()
-    for node, height in heights(topology):
-        dag.add_node(node, label=height)
-    edges = all_edges(topology)
-    dag.add_edges_from(edges)
-
-    if save_graph:
-        nx.draw(dag, with_labels=True, font_weight="bold", arrows=True)
-        plt.draw()
-        # plt.show()
-        figures_dir = "/workspace/tests/figures"
-        plt.savefig(f"{figures_dir}/FinalGraph.png")
+    topology.nodes[source_id].app_layer.process_arbitrary_message(destination_id, "Test message")
+    wait_for_action_to_complete()
 
 def main():
     # setAHCLogLevel(DEBUG)
     # deterministic_test1()
-    # random_test_by_graph_size(size=8, source_id=0, destination_id=7, save_graph=True)
-    random_test_by_graph_size(size=200, source_id=0, destination_id=99)
-    # random_test_by_graph_size(size=1000, source_id=0, destination_id=999)
-    
+    random_test_by_graph_size(size=100, source_id=0, destination_id=99)
+
 
 if __name__ == "__main__":
     main()

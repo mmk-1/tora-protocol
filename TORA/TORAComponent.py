@@ -54,6 +54,10 @@ class UpdateMessagePayload(GenericMessagePayload):
         self.height = height
         self.link_reversal = link_reversal
 
+class ArbitraryMessagePayload(GenericMessagePayload):
+    def __init__(self, destination_id: int, message):
+        self.destination_id = destination_id
+        self.message = message
 
 # The Application Layer for TORA
 class ApplicationLayerTORA(GenericModel):
@@ -78,6 +82,7 @@ class ApplicationLayerTORA(GenericModel):
     
     # When node gets message
     def on_message_from_bottom(self, eventobj: Event):
+        print("HEELP", self.componentinstancenumber)
         self.update_time()
         with self.lock:
             try:
@@ -93,10 +98,24 @@ class ApplicationLayerTORA(GenericModel):
                 elif header.messagetype == TORAControlMessageTypes.CLR:
                     self.process_clear_message(payload.did, payload.reference)
                 else:
-                    raise Exception("Unkown message type")
+                    # Here we receive some normal packet containig arbitrary sized data (for benchmarks)
+                    print("HEER")
+                    self.process_arbitrary_message(payload.did, payload.reference)
             except AttributeError:
                 print("Attribute Error")
         self.update_time()
+
+    def process_arbitrary_message(self, did: int, message: str):
+        if did == self.componentinstancenumber:
+            print(f"NODE {self.componentinstancenumber} RECEIVED MESSAGE OF LENGTH {len(message.encode())} BYTES")
+        elif len(self.find_downstream_links()) == 0:
+            print(f"Node {self.componentinstancenumber} cannot find route to destination")
+        else:
+            min_neighbour = self.find_minimum_neighbor_height()
+            print(f"Node {self.componentinstancenumber} is forwarding the message to node {min_neighbour.i}")
+            header = GenericMessageHeader("Message", self.componentinstancenumber, min_neighbour.i)
+            packet = GenericMessage(header, ArbitraryMessagePayload(did, message))
+            self.send_down(Event(self, EventTypes.MFRT, packet))
 
     def process_query_message(self, did: int, fromid: int):
         ''' Excerpt from the paper:
@@ -344,9 +363,6 @@ class TORANode(GenericModel):
 
     def on_message_from_bottom(self, eventobj: Event):
         self.send_up(Event(self, EventTypes.MFRB, eventobj.eventcontent))
-
-    # def reset_benchmark_time(self):
-    #     set_benchmark_time()
 
 # Helper functions for testing
 def all_edges(topo: Topology):
