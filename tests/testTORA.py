@@ -40,7 +40,7 @@ def deterministic_test1():
     topology.nodes[destination_id].app_layer.set_height(destination_height)
     topology.nodes[source_id].app_layer.process_query_message(destination_id, source_id)
     print(wait_for_action_to_complete() - t)
-    topology.nodes[source_id].app_layer.process_arbitrary_message(destination_id, "Test message")
+    # topology.nodes[source_id].app_layer.process_arbitrary_message(destination_id, "Test message")
 
 
     # DRAW Final DAG 
@@ -82,8 +82,8 @@ def random_test_by_graph_size(size, destination_id=7, source_id=0):
 
 def main():
     # setAHCLogLevel(DEBUG)
-    # deterministic_test1()
-    random_test_by_graph_size(size=100, source_id=0, destination_id=99)
+    deterministic_test1()
+    # random_test_by_graph_size(size=100, source_id=0, destination_id=99)
 
 
 if __name__ == "__main__":
