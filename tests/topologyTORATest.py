@@ -80,7 +80,7 @@ def run_tora_test(graph_type, size, destination_id=7, source_id=0, save_graph=Fa
         plt.draw()
         plt.savefig(f"{results_dir}/size_{size}/FinalGraph.png")
         plt.close()
-    
+
     return sum(time_list)
 
 def main():
@@ -91,7 +91,11 @@ def main():
     if os.path.exists(f"{results_dir}/benchmark_times.pkl"):
         with open(f"{results_dir}/benchmark_times.pkl", "rb") as f:
             benchmark_times = pickle.load(f)
-            len(benchmark_times)
+            print(f"Loaded benchmark_times with size: {len(benchmark_times)}")
+
+    if topology_size <= (5 * len(benchmark_times)):
+        print("No need to run topology_size: ", topology_size)
+        exit(0)
 
     if not os.path.exists(f"{results_dir}/size_{topology_size}"):
         os.makedirs(f"{results_dir}/size_{topology_size}")
@@ -99,31 +103,18 @@ def main():
     # sauce, dest = generate_source_destination(topology_size)
     temp_time = []
     print(f"====== GRAPH TYPE: {graph_type}, SIZE: {topology_size} ======")
-    i = 1
+    print("Active threads", threading.active_count())
     for j in range(3):
+        print("Active threads", threading.active_count())
         sauce, dest = generate_source_destination(topology_size)
-        print(f"{i}: ====== SOURCE: {sauce}, DEST: {dest} ======")
+        print(f"{j}: ====== SOURCE: {sauce}, DEST: {dest} ======")
         set_benchmark_time()
         temp_time.append(run_tora_test(graph_type, size=topology_size, source_id=sauce, destination_id=dest, save_graph=True))
-        i += 1
     
     benchmark_times.append(sum(temp_time) / 3)
     with open(f"{results_dir}/benchmark_times.pkl", "wb") as f:
         pickle.dump(benchmark_times, f)
 
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(topology_sizes, benchmark_times, marker='o')
-    # plt.title('Benchmark Times vs Topology Sizes')
-    # plt.xlabel('Topology Size (Number of Nodes)')
-    # plt.ylabel('Time Taken (s)')
-    # plt.grid(True)
-
-    # # Set x-axis ticks at intervals of 10
-    # plt.xticks(np.arange(min(topology_sizes), max(topology_sizes)+1, 10), 
-    #         [str(int(i)) for i in np.arange(min(topology_sizes), max(topology_sizes)+1, 10)])
-
-    # plt.savefig(f"{figures_dir}/benchmark_chart.png")
-    # plt.close() 
 
 if __name__ == "__main__":
     main()
