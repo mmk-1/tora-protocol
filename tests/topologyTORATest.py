@@ -14,6 +14,7 @@ from TORA.TORAComponent import TORANode, TORAHeight, heights, all_edges, set_ben
 
 topology_size = int(sys.argv[1])
 graph_type = sys.argv[2]
+run_no = int(sys.argv[3])
 
 proj_dir = os.getcwd()
 # figures_dir = "/workspace/tests/topology_benchmark_figures"
@@ -85,35 +86,48 @@ def run_tora_test(graph_type, size, destination_id=7, source_id=0, save_graph=Fa
 
 def main():
     # setAHCLogLevel(DEBUG)
-    benchmark_times = []
+    # benchmark_times = []
+    benchmark_dict = {}
+    '''
+    dict = {
+        topo_size = {
+            'times': []
+            'average': float
+        }
+    }
+    '''
     
     # Load the benchmark times if they exist
-    if os.path.exists(f"{results_dir}/benchmark_times.pkl"):
-        with open(f"{results_dir}/benchmark_times.pkl", "rb") as f:
-            benchmark_times = pickle.load(f)
-            print(f"Loaded benchmark_times with size: {len(benchmark_times)}")
-
-    if topology_size <= (5 * len(benchmark_times)):
-        print("No need to run topology_size: ", topology_size)
-        exit(0)
+    if os.path.exists(f"{results_dir}/benchmark_dict.pkl"):
+        with open(f"{results_dir}/benchmark_dict.pkl", "rb") as f:
+            benchmark_dict = pickle.load(f)
 
     if not os.path.exists(f"{results_dir}/size_{topology_size}"):
         os.makedirs(f"{results_dir}/size_{topology_size}")
     
     # sauce, dest = generate_source_destination(topology_size)
-    temp_time = []
+
+    # print("Active threads", threading.active_count())
+    sauce, dest = generate_source_destination(topology_size)
     print(f"====== GRAPH TYPE: {graph_type}, SIZE: {topology_size} ======")
-    print("Active threads", threading.active_count())
-    for j in range(3):
-        print("Active threads", threading.active_count())
-        sauce, dest = generate_source_destination(topology_size)
-        print(f"{j}: ====== SOURCE: {sauce}, DEST: {dest} ======")
-        set_benchmark_time()
-        temp_time.append(run_tora_test(graph_type, size=topology_size, source_id=sauce, destination_id=dest, save_graph=True))
+    print(f"{run_no}: ====== SOURCE: {sauce}, DEST: {dest} ======")
+    set_benchmark_time()
+    temp_time = run_tora_test(graph_type, size=topology_size, source_id=sauce, destination_id=dest, save_graph=True)
+
+    if topology_size not in benchmark_dict:
+        benchmark_dict[topology_size] = {}
+        benchmark_dict[topology_size]['times'] = []
+
+    benchmark_dict[topology_size]['times'].append(temp_time)
     
-    benchmark_times.append(sum(temp_time) / 3)
-    with open(f"{results_dir}/benchmark_times.pkl", "wb") as f:
-        pickle.dump(benchmark_times, f)
+    n = len(benchmark_dict[topology_size]['times'])
+    if n == 3:
+        total = sum(benchmark_dict[topology_size]['times'])
+        benchmark_dict[topology_size]['average'] = total / n
+    
+    # benchmark_times.append(sum(temp_time) / 3)
+    with open(f"{results_dir}/benchmark_dict.pkl", "wb") as f:
+        pickle.dump(benchmark_dict, f)
 
 
 if __name__ == "__main__":

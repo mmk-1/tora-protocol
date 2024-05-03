@@ -17,13 +17,17 @@ def main():
 
     for graph_type in graph_types:
         results_dir = f"{proj_dir}/tests/benchmark_results/{graph_type}"
-        bench_times_location = f"{results_dir}/benchmark_times.pkl"
+        bench_dict_dir = f"{results_dir}/benchmark_dict.pkl"
 
-        if os.path.exists(bench_times_location):
-            with open(bench_times_location, "rb") as f:
-                benchmark_times = pickle.load(f)
+        if os.path.exists(bench_dict_dir):
+            with open(bench_dict_dir, "rb") as f:
+                benchmark_dict = pickle.load(f)
 
-            topology_sizes = list(range(5, (len(benchmark_times) * 5) + 5, 5))
+            # topology_sizes = list(range(5, (len(benchmark_times) * 5) + 5, 5))
+            topology_sizes = benchmark_dict.keys()
+            benchmark_times = []
+            for k in benchmark_dict.keys():
+                benchmark_times.append(benchmark_dict[k]['average'])
             plt.plot(topology_sizes, benchmark_times, marker='o', label=graph_type)
 
     plt.title('Benchmark Times vs Topology Sizes')

@@ -29,11 +29,11 @@ do
     for (( i=5; i<=n; i++ ))
     do
         if (( i % 5 == 0 )); then
-            # for (( j=0; j<=3; j++ ))
-            # do
+            for (( j=0; j<=3; j++ ))
+            do
                 # echo "Running test with $i nodes for $graph_type"
-            python3 topologyTORATest.py $i $graph_type
-            # done
+            python3 topologyTORATest.py $i $graph_type $j
+            done
         fi
     done
 done
