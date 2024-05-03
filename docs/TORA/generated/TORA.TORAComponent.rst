@@ -29,6 +29,9 @@
    .. autoclass:: ApplicationLayerTORA
       :members:
       :undoc-members:
+   .. autoclass:: ArbitraryMessagePayload
+      :members:
+      :undoc-members:
    .. autoclass:: ClearMessagePayload
       :members:
       :undoc-members:

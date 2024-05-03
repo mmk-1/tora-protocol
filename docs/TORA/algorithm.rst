@@ -1,5 +1,8 @@
 .. include:: substitutions.rst
 
+.. role:: raw-latex(raw)
+    :format: latex
+
 |TORA|
 =========================================
 
@@ -25,26 +28,39 @@ TORA defines five cases for route maintenance to handle various scenarios in dyn
 This case occurs when a node loses its last downstream link to the destination.
 The node generates a new reference level and broadcasts it to its neighbors.
 By creating a new reference level, the node initiates the process of establishing a new route to the destination.
+:raw-latex:`$$(\tau_{i}, oid_{i}, r_{i}) = (t, i, 0), \text{where } t \text{ is the time of failure.}$$`
+
+:raw-latex:`$$(\delta_{i}, oid_{i}, r_{i}) = (0, i)$$`
 
 - Case 2 (Propagate):
 In this case, a node has no downstream links due to a link reversal following the reception of an Update (UPD) packet.
-If the ordered sets of (tau, oid, r) are not equal for all neighbors, the node propagates the reference level of its highest neighbor.
+If the ordered sets of :raw-latex:`$(\tau, oid, r)$` are not equal for all neighbors, the node propagates the reference level of its highest neighbor.
 The node selects a height that is lower than all neighbors with that reference level, ensuring the establishment of a new route based on the propagated information.
 
 - Case 3 (Reflect):
-When a node has no downstream links due to a link reversal following the reception of an UPD packet and the ordered sets of (tau, oid, r) are equal for all neighbors, with r = 0.
+When a node has no downstream links due to a link reversal following the reception of an UPD packet and the ordered sets of :raw-latex:`$(\tau, oid, r)$` are equal for all neighbors, with r = 0.
 In this scenario, the node reflects back a higher sub-level, maintaining the consistency of the reference levels among neighbors.
-This action helps in maintaining the integrity of the routing hierarchy and ensuring efficient route establishment.
+:raw-latex:`$$(\tau_{i}, oid_{i}, r_{i}) = (t_{j}, oid_{j}, 1)$$`
+
+:raw-latex:`$$(\delta_{i}, i) = (0, i)$$`
+
 
 - Case 4 (Detect):
 This case is triggered when a partition in the network is detected, indicating a significant topological change.
 Node i sets its height and the height entry for each neighbor to NULL, except when the destination is a neighbor, in which case the corresponding height entry is set to ZERO.
 All entries in the link-state array are updated, and a Clear (CLR) packet is broadcast to erase invalid routes and initiate the route re-establishment process.
+:raw-latex:`$$(\tau_{i}, oid_{i}, r_{i}) = (NULL, NULL, NULL)$$`
+
+:raw-latex:`$$(\delta_{i}, i) = (NULL, i)$$`
 
 - Case 5 (Generate):
 Similar to Case 1, this case involves generating a new reference level when a node loses its last downstream link to the destination.
 The node creates a new reference level and broadcasts it to neighbors, initiating the process of establishing a new route to the destination.
 This action ensures that the routing hierarchy is maintained and that routes are efficiently re-established in response to topological changes.
+:raw-latex:`$$(\tau_{i}, oid_{i}, r_{i}) = (t, i, 0)\text{, where } t \text{ is the failure time}$$`
+
+:raw-latex:`$$(\delta_{i}, i) = (0, i)$$`
+
 
 .. _BlindFloodingAlgorithmLabel:
 
@@ -53,30 +69,54 @@ This action ensures that the routing hierarchy is maintained and that routes are
     :caption: Temporally-Ordered Routing Algorithm
     
 
-    bool referenceLevelRecorded, reflectionBitSet[c] for all neighbors c of node i; 
-    referenceLevelQueue stateQueue[c] for all neighbors c of node i;
+    Events: OnMessageFromBottom
 
-    If node i wants to initiate route maintenance 
-        perform procedure InitiateRouteMaintenance(i);
+    OnMessageFromBottom(m):
+        If m.type == QRY:
+            Handle_QRY(m);
+        Else if m.type == CLR:
+            Handle_CLR(m);
+        Else if m.type == UPD:
+            Handle_UPD(m);
 
-    If node i receives a control message msg through an incoming channel c0
-        if referenceLevelRecorded = true and reflectionBitSet[c0] = false then 
-            stateQueue[c0] ← append(stateQueue[c0], msg);
-        end if
+    Handle_QRY(m):
+        If no downstream links and route not required:
+            Broadcast(QRY, destination);
+        Else if height.delta is NULL:
+            minHeight = findMinHeight();
+            setHeight(minHeight + 1);
+            linkReverse = false;
+            broadcast(UPD, minHeight, destination, linkReverse);
+    
+    Handle_CLR(m):
+        If m.referenceLevel == height.referenceLevel:
+            setHeightToNull();
+        for each neighbor that is not destination:
+            setHeightToNull(neighbor);
+        If m.reference_level == height.referenceLevel:
+            broadcast (CLR, destination, m.referenceLevel);
 
-    If node i receives ⟨reflection⟩ through an incoming channel c0
-        perform procedure InitiateRouteMaintenance(i);
-        reflectionBitSet[c0] ← true;
-        if reflectionBitSet[c] = true for all neighbors c of node i then
-            terminate; 
-        end if
-
-    Procedure InitiateRouteMaintenance(i)
-    if referenceLevelRecorded = false then
-        referenceLevelRecorded ← true;
-        send ⟨reflection⟩ into each outgoing channel of node i; 
-        take a local snapshot of the state of node i;
-    end if
+    Handle_UPD(m):
+        If m.linkReverse == true and no downstream link:
+            for each upstream neighbor:
+                UpdateReferenceLevel();
+            
+            If not same reference level:
+                Case2();
+            Else if m.referenceLevel(oid) == 0:
+                Case3();
+            Else if m.referenceLevel(i) == node id:
+                Case4();
+            Else:
+                Case5();
+        Else:
+            If route not required:
+                Case1();
+            Else:
+                UpdateHeight();
+                linkReverse = false;
+                Broadcast(UPD, height, destination, linkReverse);
+            
 
 
 Example
@@ -93,7 +133,7 @@ The correctness of TORA is ensured by its ability to establish loop-free routes,
 Complexity 
 ~~~~~~~~~~
 
-1. Time Complexity The Temporally-Ordered Routing Algorithm takes at most O(2D) time units to complete where D is the diameter of the network (maximum number of nodes in the longest path).
+1. Time Complexity: The Temporally-Ordered Routing Algorithm takes at most O(2D) time units to complete where D is the diameter of the network (maximum number of nodes in the longest path).
 2. Space Complexity: The space complexity is O(D_d*A) where D_d is the number of maximum desired destinations and A is the average number of adjacent nodes.
 
 .. [Fokking2013] Wan Fokkink, Distributed Algorithms An Intuitive Approach, The MIT Press Cambridge, Massachusetts London, England, 2013

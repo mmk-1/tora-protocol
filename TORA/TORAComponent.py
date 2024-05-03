@@ -271,7 +271,7 @@ class ApplicationLayerTORA(GenericModel):
         for neighbor in self.neighbor_heights:
             if neighbor == destination_id:
                 continue
-            if reference_level == (self.height.tau,self.height.oid,self.height.r,) or reference_level == (self.neighbor_heights[neighbor][0].tau,self.neighbor_heights[neighbor][0].oid,self.neighbor_heights[neighbor][0].r):
+            if reference_level == (self.height.tau,self.height.oid,self.height.r) or reference_level == (self.neighbor_heights[neighbor][0].tau,self.neighbor_heights[neighbor][0].oid,self.neighbor_heights[neighbor][0].r):
                 self.neighbor_heights[neighbor] = (None,None,None,None,self.componentinstancenumber)
         if reference_level == (self.height.tau, self.height.oid, self.height.r):
             broadcaster = self.Broadcaster(self, TORAControlMessageTypes.CLR, self.componentinstancenumber, destination_id=destination_id, reference_level=reference_level)
