@@ -106,6 +106,9 @@ def main():
         os.makedirs(f"{results_dir}/size_{topology_size}")
     
     # sauce, dest = generate_source_destination(topology_size)
+    if topology_size not in benchmark_dict:
+        benchmark_dict[topology_size] = {}
+        benchmark_dict[topology_size]['times'] = []
 
     # print("Active threads", threading.active_count())
     sauce, dest = generate_source_destination(topology_size)
@@ -114,16 +117,13 @@ def main():
     set_benchmark_time()
     temp_time = run_tora_test(graph_type, size=topology_size, source_id=sauce, destination_id=dest, save_graph=True)
 
-    if topology_size not in benchmark_dict:
-        benchmark_dict[topology_size] = {}
-        benchmark_dict[topology_size]['times'] = []
-
     benchmark_dict[topology_size]['times'].append(temp_time)
     
     n = len(benchmark_dict[topology_size]['times'])
     if n == 3:
         total = sum(benchmark_dict[topology_size]['times'])
         benchmark_dict[topology_size]['average'] = total / n
+        print("average: ", benchmark_dict[topology_size]['average'])
     
     # benchmark_times.append(sum(temp_time) / 3)
     with open(f"{results_dir}/benchmark_dict.pkl", "wb") as f:
