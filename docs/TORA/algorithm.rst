@@ -122,7 +122,25 @@ This action ensures that the routing hierarchy is maintained and that routes are
 Example
 ~~~~~~~~
 
-Provide an example for the distributed algorithm.
+Imagine the scanrio in the figure below where nodes A, B, C, and D are connected in a network. Node A wants to send a message to node D. In the start all nodes have a null height except for the destination which has a height of zero. Node A sends a Query (QRY) packet to its neighbor B to establish a route to node D. B then broadcasts the message to its neighbor C and so on until it reaches the destination D.
+
+.. image:: figures/example1.png
+  :width: 500
+  :alt: TORA example 1
+
+In this case, D will send back an Update (UPD) packet to its neighbors to establish the route. C will receive the UPD packet and will update its height along with incrementing the height in the UPD message. When B receives the UPD packet, it will update its height and broadcast the message to A. Finally, A will receive the UPD packet and update its height.
+
+.. image:: figures/example2.png
+  :width: 500
+  :alt: TORA example 2
+
+As you can see from the figure, now we can establish a route from A to D to form a DAG. This is because there are now downstream links from A to B to C to D.
+
+.. image:: figures/example3.png
+  :width: 500
+  :alt: TORA example 3
+
+This demonstrates a basic example of how TORA works to establish a route in a mobile ad hoc network. Of course in a more complex network, more maintainence cases are needed to handle various scenarios.
 
 Correctness
 ~~~~~~~~~~~
