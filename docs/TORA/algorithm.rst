@@ -11,7 +11,7 @@
 Background and Related Work
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Temporally-Ordered Routing Algorithm was originally proposed in [CITATION] by Vincent D. Park and M. Scott Corson. TORA is a distributed algorithm designed for mobile ad hoc networks to establish and maintain efficient routes in dynamic network environments. The algorithm is based on the concept of link reversal, where nodes maintain a logical link reversal hierarchy to facilitate routing decisions in response to topological changes.
+Temporally-Ordered Routing Algorithm was originally proposed in [Park1997]_ by Vincent D. Park and M. Scott Corson. TORA is a distributed algorithm designed for mobile ad hoc networks to establish and maintain efficient routes in dynamic network environments. The algorithm is based on the concept of link reversal, where nodes maintain a logical link reversal hierarchy to facilitate routing decisions in response to topological changes.
 
 Distributed Algorithm: |TORA|
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -20,7 +20,7 @@ In the Temporally-Ordered Routing Algorithm (TORA), control packets play a cruci
 
 The handling of control packets in TORA is based on the concept of link reversal. When a link failure occurs, the affected node broadcasts a Clear (CLR) packet to inform its neighbors about the failure. Neighboring nodes then propagate the CLR packet, triggering a process of link reversal to re-establish routes around the failed link. Additionally, Update (UPD) packets are used to disseminate information about changes in the network topology, ensuring that all nodes have up-to-date routing information.
 
-In TORA, the creation of a route involves the establishment of a directed acyclic graph (DAG) based on the relative positions of nodes in the network. This DAG helps in determining the logical link reversal hierarchy, which guides the routing decisions in response to topological changes. The algorithm ensures loop-free routes by utilizing the DAG structure and maintaining multiple routes for any given source/destination pair, enhancing the robustness of the routing process.
+In TORA, the creation of a route involves the establishment of a directed acyclic graph (DAG) based on the relative positions of nodes in the network. The algorithm ensures loop-free routes by utilizing the DAG structure and maintaining multiple routes for any given source/destination pair, enhancing the robustness of the routing process.
 
 TORA defines five cases for route maintenance to handle various scenarios in dynamic network environments:
 
@@ -151,9 +151,10 @@ The correctness of TORA is ensured by its ability to establish loop-free routes,
 Complexity 
 ~~~~~~~~~~
 
-1. Time Complexity: The Temporally-Ordered Routing Algorithm takes at most O(2D) time units to complete where D is the diameter of the network (maximum number of nodes in the longest path).
-2. Space Complexity: The space complexity is O(D_d*A) where D_d is the number of maximum desired destinations and A is the average number of adjacent nodes.
+1. Time Complexity: The Temporally-Ordered Routing Algorithm takes at most :raw-latex:`$O(2D)$` time units to complete where D is the diameter of the network (maximum number of nodes in the longest path).
+2. Space Complexity: The space complexity is :raw-latex:`$O(D_{d}*A)$` where :raw-latex:`$D_d$` is the number of maximum desired destinations and A is the average number of adjacent nodes (neighbors).
 
-.. [Fokking2013] Wan Fokkink, Distributed Algorithms An Intuitive Approach, The MIT Press Cambridge, Massachusetts London, England, 2013
-.. [Tel2001] Gerard Tel, Introduction to Distributed Algorithms, CAMBRIDGE UNIVERSITY PRESS, 2001
-.. [Lamport1985] Leslie Lamport, K. Mani Chandy: Distributed Snapshots: Determining Global States of a Distributed System. In: ACM Transactions on Computer Systems 3. Nr. 1, Februar 1985.
+More discussions and comparisons about the complexity of TORA and other routing algorithms can be found in [Biradar2006]_.
+
+.. [Park1997] Park, V., & Corson, M. S. (1997). A highly adaptive distributed routing algorithm for mobile wireless networks. INFOCOM 1997
+.. [Biradar2006] Biradar, R. V., & Patil, V. C. (2006). Classification and Comparison of Routing Techniques in Wireless Ad Hoc Networks. 2006 International Symposium on Ad Hoc and Ubiquitous Computing.
