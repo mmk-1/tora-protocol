@@ -1,6 +1,6 @@
 {
     "name": "tora-dev",
-    "image": "ahc_dev_container:latest",
+    "image": "tora-dev:latest",
     "runArgs": [
         "--rm",
         "--privileged",

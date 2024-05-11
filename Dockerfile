@@ -18,7 +18,8 @@ RUN apt -y install  openvswitch-switch \
     git \
     texlive-latex-extra \
     latexmk \
-    locales
+    locales \
+    pandoc
 
 RUN locale-gen en_US.UTF-8 && \
     echo "LANG=en_US.UTF-8" > /etc/default/locale
@@ -28,6 +29,10 @@ RUN git clone https://github.com/cengwins/ahc && \
     pip3 install -r requirements.txt
 
 RUN pip3 install adhoccomputing
+RUN pip3 install sphinx-autodoc-typehints
+RUN pip3 install nbsphinx
+RUN pip install --upgrade pip ipython ipykernel
+RUN ipython kernel install --name "python3" --user
 
 ENV HOME /root
 
