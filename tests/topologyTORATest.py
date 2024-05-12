@@ -16,6 +16,8 @@ topology_size = int(sys.argv[1])
 graph_type = sys.argv[2]
 run_no = int(sys.argv[3])
 
+TOTAL_RUNS = 5
+
 proj_dir = os.getcwd()
 # figures_dir = "/workspace/tests/topology_benchmark_figures"
 results_dir = f"{proj_dir}/tests/benchmark_results/{graph_type}"
@@ -37,6 +39,10 @@ def nx_graph(graph_type, size):
         graph = nx.cycle_graph(size)
     elif graph_type == 'star_graph':
         graph = nx.star_graph(size)
+    elif graph_type == 'wheel_graph':
+        graph = nx.wheel_graph(size)
+    elif graph_type == 'ladder_graph':
+        graph = nx.ladder_graph(size)
     return graph
 
 def run_tora_test(graph_type, size, destination_id=7, source_id=0, save_graph=False):
@@ -110,6 +116,11 @@ def main():
         benchmark_dict[topology_size] = {}
         benchmark_dict[topology_size]['times'] = []
 
+    n = len(benchmark_dict[topology_size]['times'])
+    # Recalculate the whole size again if half-complete
+    if n != TOTAL_RUNS and n >= 1 :
+        benchmark_dict[topology_size]['times'] = []
+
     # print("Active threads", threading.active_count())
     sauce, dest = generate_source_destination(topology_size)
     print(f"====== GRAPH TYPE: {graph_type}, SIZE: {topology_size} ======")
@@ -119,11 +130,11 @@ def main():
 
     benchmark_dict[topology_size]['times'].append(temp_time)
     
-    n = len(benchmark_dict[topology_size]['times'])
-    if n == 3:
+    # n = len(benchmark_dict[topology_size]['times'])
+    if n == TOTAL_RUNS:
         total = sum(benchmark_dict[topology_size]['times'])
         benchmark_dict[topology_size]['average'] = total / n
-        print("average: ", benchmark_dict[topology_size]['average'])
+        print(f"average of {n} runs: ", benchmark_dict[topology_size]['average'])
     
     # benchmark_times.append(sum(temp_time) / 3)
     with open(f"{results_dir}/benchmark_dict.pkl", "wb") as f:

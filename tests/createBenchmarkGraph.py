@@ -11,6 +11,8 @@ def main():
         "random_tree",
         "star_graph",
         "cycle_graph",
+        "wheel_graph",
+        "ladder_graph",
     ]
 
     plt.figure(figsize=(10, 6))
