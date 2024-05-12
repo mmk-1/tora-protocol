@@ -116,10 +116,10 @@ def main():
         benchmark_dict[topology_size] = {}
         benchmark_dict[topology_size]['times'] = []
 
-    n = len(benchmark_dict[topology_size]['times'])
+    # n = len(benchmark_dict[topology_size]['times'])
     # Recalculate the whole size again if half-complete
-    if n != TOTAL_RUNS and n >= 1 :
-        benchmark_dict[topology_size]['times'] = []
+    # if n != TOTAL_RUNS and n >= 1 :
+    #     benchmark_dict[topology_size]['times'] = []
 
     # print("Active threads", threading.active_count())
     sauce, dest = generate_source_destination(topology_size)
@@ -130,7 +130,7 @@ def main():
 
     benchmark_dict[topology_size]['times'].append(temp_time)
     
-    # n = len(benchmark_dict[topology_size]['times'])
+    n = len(benchmark_dict[topology_size]['times'])
     if n == TOTAL_RUNS:
         total = sum(benchmark_dict[topology_size]['times'])
         benchmark_dict[topology_size]['average'] = total / n

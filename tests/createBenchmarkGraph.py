@@ -7,7 +7,7 @@ def main():
     proj_dir = os.getcwd()
     
     graph_types = [
-        "complete_graph", 
+        # "complete_graph", 
         "random_tree",
         "star_graph",
         "cycle_graph",
@@ -46,7 +46,7 @@ def main():
     if not os.path.exists(figures_dir):
         os.makedirs(figures_dir)
 
-    plt.savefig(f"{figures_dir}/benchmark_chart.png")
+    plt.savefig(f"{figures_dir}/benchmark_chart2.png")
     plt.close()
 
 if __name__ == "__main__":

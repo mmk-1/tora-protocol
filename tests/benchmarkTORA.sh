@@ -17,12 +17,12 @@ n=$1
 # done
 
 graph_types=(
-    # "complete_graph" 
-    "random_tree" 
-    "star_graph" 
-    "cycle_graph"
-    "wheel_graph"
-    "ladder_graph"
+    "complete_graph" 
+    # "random_tree" 
+    # "star_graph" 
+    # "cycle_graph"
+    # "wheel_graph"
+    # "ladder_graph"
 )
 
 # Start from at least 5 nodes and only count by 5
