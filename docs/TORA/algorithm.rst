@@ -12,9 +12,20 @@ Background and Related Work
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Temporally-Ordered Routing Algorithm was originally proposed in [Park1997]_ by Vincent D. Park and M. Scott Corson. TORA is a distributed algorithm designed for mobile ad hoc networks to establish and maintain efficient routes in dynamic network environments. The algorithm is based on the concept of link reversal, where nodes maintain a logical link reversal hierarchy to facilitate routing decisions in response to topological changes.
+While other solutions existed at  the time TORA was proposed, they had some specific set of problems that TORA looked to address. The majority of these problems fall under the following categories:
+
+- They are link-state algorithms, hence not suitable for a mesh ad-hoc network
+
+- They are not efficient in routing
+
+- They can only provide one route from source to destination which means no flexibility in case of congestion
+
+As mentioned TORA eliminates such issues with its implementation.
 
 Distributed Algorithm: |TORA|
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The idea behind how TORA operates is analogous to a fluid flow scheme. In this scheme all the fluid flows from the highest point (source) to the lowest point (destination). Therefore, the there is a natural flow from upstream to downstream. Any intermediate node should have a height between the minimum and the maximum in such a way that there is always a direction towards the destination. If an intermediate node only has inbound links, it's height must be elevated to prevent the diverting the flow to this node instead of the destination.
 
 In the Temporally-Ordered Routing Algorithm (TORA), control packets play a crucial role in facilitating efficient routing in mobile wireless networks. TORA utilizes three main types of control packets: Query (QRY), Clear (CLR), and Update (UPD). When a node needs to establish or update a route to a destination, it broadcasts a Query (QRY) packet to its neighbors. Upon receiving a QRY packet, neighboring nodes determine their relative positions in the network and create a directed acyclic graph (DAG) based on this information. The DAG helps in establishing a logical link reversal hierarchy for routing decisions.
 

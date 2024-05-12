@@ -7,7 +7,7 @@ def main():
     proj_dir = os.getcwd()
     
     graph_types = [
-        # "complete_graph", 
+        "complete_graph",
         "random_tree",
         "star_graph",
         "cycle_graph",
